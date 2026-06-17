@@ -1,0 +1,10 @@
+# Runtime dependencies. The self-updater diffs THIS file between commits to decide
+# whether to re-run `pip install` before applying new code. Keep it in sync with
+# pyproject.toml [project.dependencies]. Tighten to exact == pins for reproducible fleets.
+firebirdsql>=1.2,<2
+passlib>=1.7,<2               # required by firebirdsql for the auth handshake
+APScheduler>=3.10,<4
+pydantic>=2.7,<3
+pydantic-settings>=2.4,<3
+requests>=2.31,<3
+tomli>=2.0; python_version < "3.11"

@@ -1,0 +1,52 @@
+# Syncronizer configuration — copy to  <DATA_DIR>/config/config.toml
+# On Windows the installer writes this to  C:\ProgramData\Syncronizer\config\config.toml
+# For local dev:  $SYNCRONIZER_DATA_DIR/config/config.toml  (e.g. ./data/config/config.toml)
+#
+# This file holds SECRETS (Firebird path/credentials, API token). It lives OUTSIDE the
+# git working tree and is .gitignored — it must NEVER be committed to the public repo.
+# Any value can also be supplied/overridden by a SYNC_<UPPER_FIELD> environment variable.
+
+[firebird]
+# REQUIRED: absolute path to the local Firebird 2.5 .fdb (raw path; do not URL-encode).
+path = "C:\\data\\app.fdb"
+host = "localhost"
+port = 3050
+user = "SYSDBA"
+password = "masterkey"        # prefer the SYNC_FIREBIRD_PASSWORD env var over plaintext here
+charset = "UTF8"              # use "NONE" or "WIN1252" for legacy databases
+connect_timeout = 10.0
+
+[api]
+base_url = "https://api.example.com"
+key = ""                      # API KEY sent on every request (prefer SYNC_API_KEY env)
+key_header = "X-API-Key"      # header name your API expects (e.g. "apikey", "X-Api-Key")
+token = ""                    # optional Bearer token alternative (prefer SYNC_API_TOKEN)
+timeout = 30
+max_retries = 3
+
+[runtime]
+cycle_minutes = 10
+batch_size = 500
+misfire_grace_time = 300
+run_on_start = true
+
+[update]
+auto_update = true
+branch = "main"               # tracked channel; consider a protected "release" branch in production
+update_minutes = 30
+repo_url = "https://github.com/azimute-tech/syncronizer.git"
+allow_hard_reset = false      # opt-in recovery from a force-pushed/rebased upstream
+max_boot_attempts = 3
+boot_grace_minutes = 5
+
+[paths]
+# Installer-written absolute paths. Leave unset in dev (derived from the data dir).
+# git_exe = "C:\\Program Files\\Syncronizer\\runtime\\git\\cmd\\git.exe"
+# nssm_exe = "C:\\Program Files\\Syncronizer\\runtime\\nssm\\nssm.exe"
+# repo_dir = "C:\\ProgramData\\Syncronizer\\repo"
+# venv_dir = "C:\\ProgramData\\Syncronizer\\venv"
+
+[logging]
+level = "INFO"
+max_bytes = 10485760          # 10 MB
+backup_count = 7

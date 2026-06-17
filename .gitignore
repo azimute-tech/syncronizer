@@ -1,0 +1,30 @@
+# --- secrets & runtime data: MUST NEVER be committed to the public repo ---
+# (defense-in-depth; the real protection is that these live OUTSIDE the git tree,
+#  under C:\ProgramData\Syncronizer on the target)
+config.toml
+*.toml.local
+.env
+*.db
+*.db-wal
+*.db-shm
+*.fdb
+*.log
+
+# local dev data dir (SYNCRONIZER_DATA_DIR=./data)
+/data/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+
+# installer build artifacts (downloaded runtimes, compiled setup.exe)
+/packaging/build/
+/packaging/dist/
+*.exe
