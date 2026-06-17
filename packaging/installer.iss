@@ -110,13 +110,13 @@ begin
   CfgPage := CreateInputQueryPage(wpSelectDir,
     'Firebird & API configuration',
     'Where is the data and where does it go?',
-    'Provide the local Firebird database path and the API key sent on every POST. The API fields are optional and can be changed later in config.toml.');
-  CfgPage.Add('Firebird database (.fdb) full path:', False);
-  CfgPage.Add('API base URL (optional):', False);
-  CfgPage.Add('API Key (sent on every request):', True);   { masked }
-  CfgPage.Add('API Key header name:', False);
+    'Informe o caminho do Firebird (.fdb), a URL base da API e a API Key. Tudo pode ser alterado depois em config.toml.');
+  CfgPage.Add('Caminho completo do banco Firebird (.fdb):', False);
+  CfgPage.Add('URL base da API (ex.: https://api.exemplo.com):', False);
+  CfgPage.Add('API Key (enviada em toda requisicao):', True);   { masked }
+  CfgPage.Add('Nome do header da API Key:', False);
   CfgPage.Values[0] := 'C:\data\app.fdb';
-  CfgPage.Values[1] := '';
+  CfgPage.Values[1] := 'https://';
   CfgPage.Values[2] := '';
   CfgPage.Values[3] := 'X-API-Key';
 end;
@@ -128,8 +128,20 @@ begin
   begin
     if not FileExists(CfgPage.Values[0]) then
     begin
-      MsgBox('The Firebird .fdb path does not exist:' + #13#10 + CfgPage.Values[0],
+      MsgBox('O caminho do banco Firebird (.fdb) nao existe:' + #13#10 + CfgPage.Values[0],
         mbError, MB_OK);
+      Result := False;
+    end
+    else if (Pos('http://', LowerCase(CfgPage.Values[1])) <> 1) and
+            (Pos('https://', LowerCase(CfgPage.Values[1])) <> 1) then
+    begin
+      MsgBox('Informe a URL base da API (deve comecar com http:// ou https://).',
+        mbError, MB_OK);
+      Result := False;
+    end
+    else if (Length(Trim(CfgPage.Values[1])) <= 8) then
+    begin
+      MsgBox('A URL base da API esta incompleta.', mbError, MB_OK);
       Result := False;
     end;
   end;
