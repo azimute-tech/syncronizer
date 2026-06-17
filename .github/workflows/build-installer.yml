@@ -1,0 +1,42 @@
+name: build-installer
+
+# Builds the double-click Windows installer (syncronizer-setup.exe) on a cloud
+# Windows runner — no local Windows machine needed. Download it from the run's
+# "Artifacts", or, for a tag push (vX.Y.Z), from the auto-created GitHub Release.
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ["v*"]
+  workflow_dispatch: {}   # adds a manual "Run workflow" button
+
+permissions:
+  contents: write          # needed to attach the exe to a Release on tags
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # avoids GitHub API rate limits
+        run: ./packaging/build_installer.ps1
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: syncronizer-setup
+          path: packaging/dist/syncronizer-setup.exe
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release (tag pushes only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packaging/dist/syncronizer-setup.exe

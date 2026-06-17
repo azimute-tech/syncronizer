@@ -51,8 +51,19 @@ Copy `src/syncronizer/endpoints/_template.py` to `endpoints/<name>.py`, fill in
 with the real Firebird SQL, map columns in `transform()`, commit and push. Machines
 pick it up on the next git-sync tick.
 
-## Build the Windows installer
+## Get the Windows installer (no local Windows needed)
 
-On a Windows build box, run `packaging/build_installer.ps1` (downloads the
-relocatable Python + MinGit + NSSM and compiles `setup.exe` with Inno Setup).
-See `packaging/installer.iss`.
+The `setup.exe` is built in the cloud by GitHub Actions on a Windows runner
+(`.github/workflows/build-installer.yml`). You never need a local Windows machine:
+
+- **Any build:** open the repo's **Actions** tab → the latest `build-installer` run →
+  download the **`syncronizer-setup`** artifact.
+- **Release build:** push a tag `vX.Y.Z` → a GitHub **Release** is created with
+  `syncronizer-setup.exe` attached.
+- **Manual:** Actions tab → `build-installer` → **Run workflow**.
+
+The installer bundles a relocatable Python + MinGit + NSSM, clones this repo, registers
+the Windows service and starts it. The target machine needs nothing pre-installed.
+
+To build locally instead (on a Windows box with Inno Setup 6):
+`pwsh packaging/build_installer.ps1` → `packaging/dist/syncronizer-setup.exe`.
