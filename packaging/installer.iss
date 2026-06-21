@@ -227,3 +227,20 @@ begin
     WriteConfig;   // write config.toml BEFORE the [Run] clone/pip/self-check entries
   end;
 end;
+
+// On uninstall, after the service is removed, offer to wipe the data dir
+// (control.db, logs and config.toml) so the next install starts from zero.
+procedure CurUninstallStepChanged(CurStep: TUninstallStep);
+begin
+  if CurStep = usPostUninstall then
+  begin
+    if DirExists(ExpandConstant('{commonappdata}\Syncronizer')) then
+    begin
+      if MsgBox('Remover tambem todos os dados e configuracoes ' +
+                '(control.db, logs e config.toml em ProgramData)?' + #13#10 +
+                'Escolha Sim para comecar do zero (ex.: migrar de dev para prod).',
+                mbConfirmation, MB_YESNO) = IDYES then
+        DelTree(ExpandConstant('{commonappdata}\Syncronizer'), True, True, True);
+    end;
+  end;
+end;
