@@ -33,6 +33,12 @@ META_DDL = (
     );
     """,
     """
+    CREATE TABLE IF NOT EXISTS _endpoint_config (
+        endpoint TEXT PRIMARY KEY,
+        enabled  INTEGER NOT NULL DEFAULT 1
+    );
+    """,
+    """
     CREATE TABLE IF NOT EXISTS _sync_log (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         run_at     TEXT NOT NULL,

@@ -9,7 +9,7 @@ from .config import Settings, load_settings
 from .core import orchestrator, registry
 from .core.migrations import run_migrations
 from .db.firebird import FirebirdClient
-from .db.store import ControlStore
+from .db.store import ControlStore, now_iso
 from .http.client import HttpClient
 from .logging_setup import summary_line
 from .paths import build_paths
@@ -39,6 +39,8 @@ class Application:
         )
         self._restart_requested = False
         self._had_successful_cycle = False
+        self.last_cycle_at = None
+        self.last_fb_ok = False
 
     def run_cycle(self):
         log.info("CYCLE START")
@@ -50,6 +52,8 @@ class Application:
         finally:
             fb.close()
         totals = stats.totals()
+        self.last_cycle_at = now_iso()
+        self.last_fb_ok = stats.firebird_available
         log.info("CYCLE END %s", summary_line(fb=stats.firebird_available, **totals))
         # A cycle that completed with no per-endpoint exceptions means this commit's
         # code runs (Firebird/API being down are environmental, not code defects).

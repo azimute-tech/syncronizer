@@ -15,10 +15,14 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from . import bootgate, updater
+from .web import server as webserver
 
 
 def run_service(app, log) -> None:
     s = app.settings
+
+    # Start the localhost admin UI (config/logs/endpoints). Runs even with no config.
+    webserver.start(app, log)
 
     executors = {"default": ThreadPoolExecutor(1)}
     job_defaults = {"coalesce": True, "max_instances": 1,
@@ -53,6 +57,13 @@ def run_service(app, log) -> None:
         except Exception as exc:  # noqa: BLE001
             log.exception("update job error: %s", exc)
 
+    def restart_watch():
+        # honor a restart requested by the admin UI (or self-update) promptly
+        if app.restart_requested:
+            log.info("restart requested; shutting down scheduler for relaunch")
+            sched.shutdown(wait=False)
+
+    sched.add_job(restart_watch, "interval", seconds=15, id="restart_watch")
     sched.add_job(etl_job, "interval", minutes=s.cycle_minutes, id="etl")
     if s.auto_update:
         sched.add_job(update_job, "interval", minutes=s.update_minutes, id="update")
