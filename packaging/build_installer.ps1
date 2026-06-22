@@ -41,8 +41,17 @@ function Get-LatestAsset([string]$repo, [string]$pattern) {
 }
 
 function Get-File([string]$url, [string]$dest) {
-    Write-Host "Downloading $url"
-    Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
+    for ($i = 1; $i -le 4; $i++) {
+        try {
+            Write-Host "Downloading $url (tentativa $i)"
+            Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing -TimeoutSec 180
+            return
+        } catch {
+            Write-Warning "download falhou ($($_.Exception.Message)); retry em 5s"
+            Start-Sleep -Seconds 5
+        }
+    }
+    throw "download falhou apos varias tentativas: $url"
 }
 
 if (-not $PythonUrl) {
@@ -71,16 +80,23 @@ if (-not (Test-Path (Join-Path $build "git\cmd\git.exe"))) {
     throw "Expected $build\git\cmd\git.exe after extraction."
 }
 
-# 3) NSSM (zip with win64\nssm.exe).
-$nssmZip = Join-Path $build "nssm.zip"
-Get-File $NssmUrl $nssmZip
-$nssmTmp = Join-Path $build "nssm_tmp"
-if (Test-Path $nssmTmp) { Remove-Item -Recurse -Force $nssmTmp }
-Expand-Archive -Path $nssmZip -DestinationPath $nssmTmp -Force
-$nssmExe = Get-ChildItem -Path $nssmTmp -Recurse -Filter nssm.exe |
-    Where-Object { $_.FullName -match "win64" } | Select-Object -First 1
+# 3) NSSM — use the VENDORED binary (nssm.cc is flaky / returns 503). Fall back to
+#    downloading only if the vendored copy is missing.
 New-Item -ItemType Directory -Force -Path (Join-Path $build "nssm") | Out-Null
-Copy-Item $nssmExe.FullName (Join-Path $build "nssm\nssm.exe") -Force
+$vendorNssm = Join-Path $here "vendor\nssm.exe"
+if (Test-Path $vendorNssm) {
+    Write-Host "Using vendored nssm.exe ($vendorNssm)"
+    Copy-Item $vendorNssm (Join-Path $build "nssm\nssm.exe") -Force
+} else {
+    $nssmZip = Join-Path $build "nssm.zip"
+    Get-File $NssmUrl $nssmZip
+    $nssmTmp = Join-Path $build "nssm_tmp"
+    if (Test-Path $nssmTmp) { Remove-Item -Recurse -Force $nssmTmp }
+    Expand-Archive -Path $nssmZip -DestinationPath $nssmTmp -Force
+    $nssmExe = Get-ChildItem -Path $nssmTmp -Recurse -Filter nssm.exe |
+        Where-Object { $_.FullName -match "win64" } | Select-Object -First 1
+    Copy-Item $nssmExe.FullName (Join-Path $build "nssm\nssm.exe") -Force
+}
 
 # 4) Offline seed snapshot of the repo (excludes git metadata + local artifacts).
 $seed = Join-Path $build "seed"
