@@ -6,6 +6,7 @@ phase still flushes previously-staged rows).
 """
 from __future__ import annotations
 
+import collections
 from typing import Sequence
 
 from ..config import ConfigError
@@ -148,6 +149,10 @@ def _send_endpoint(ep: Endpoint, store, http, log, est: EndpointStats, batch_siz
     for pk, err in result.failed:
         store.mark_failed(ep.name, pk, err)
     est.failed = len(result.failed)
+    if result.failed:
+        reasons = collections.Counter(str(err)[:160] for _, err in result.failed)
+        for reason, n in reasons.most_common(3):
+            log.warning("[%s] envio falhou (%dx): %s", ep.name, n, reason)
     status = "ok" if not result.failed else "partial"
     store.touch_endpoint(ep.name, last_send_at=now_iso(), status=status)
     store.log_run(ep.name, "send", sent=est.sent, failed=est.failed, status=status)
