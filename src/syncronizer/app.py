@@ -55,6 +55,13 @@ class Application:
         self.last_cycle_at = now_iso()
         self.last_fb_ok = stats.firebird_available
         log.info("CYCLE END %s", summary_line(fb=stats.firebird_available, **totals))
+        # Per-endpoint backlog/progress so the log shows how much is left to send.
+        for ep in self.endpoints:
+            c = self.store.endpoint_counts(ep.name)
+            if c["total"]:
+                pct = c["sent"] * 100 // c["total"]
+                log.info("  PROGRESSO %s: enviados=%d/%d (%d%%) pendentes=%d deletados=%d",
+                         ep.name, c["sent"], c["total"], pct, c["pending"], c["deleted"])
         # A cycle that completed with no per-endpoint exceptions means this commit's
         # code runs (Firebird/API being down are environmental, not code defects).
         if totals["errors"] == 0:
