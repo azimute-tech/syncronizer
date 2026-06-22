@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
+from ..config import ConfigError
 from ..db.firebird import FirebirdUnavailable
 from ..db.store import now_iso
 from ..runtime import CycleStats, EndpointStats
@@ -18,16 +19,20 @@ from .hashing import canonical_json, row_hash
 
 def run_cycle(endpoints: Sequence[Endpoint], fb, store, http, log, batch_size: int) -> CycleStats:
     stats = CycleStats()
+    # only run endpoints that are enabled in the admin UI
+    active = [ep for ep in endpoints if store.is_endpoint_enabled(ep.name)]
 
     # ---- PHASE 1: ETL ----
     try:
         fb.connect()
-    except FirebirdUnavailable as exc:
+    except (FirebirdUnavailable, ConfigError) as exc:
+        # Not reachable OR not configured yet (fresh install) — skip ETL, keep running
+        # so the admin UI stays available for the user to configure it.
         stats.firebird_available = False
-        log.warning("Firebird unavailable; skipping ETL phase this cycle: %s", exc)
+        log.warning("Firebird unavailable/not configured; skipping ETL this cycle: %s", exc)
 
     if stats.firebird_available:
-        for ep in endpoints:
+        for ep in active:
             est = stats.endpoint(ep.name)
             try:
                 _etl_endpoint(ep, fb, store, log, est)
@@ -40,7 +45,7 @@ def run_cycle(endpoints: Sequence[Endpoint], fb, store, http, log, batch_size: i
                 store.log_run(ep.name, "etl", status="error", error=str(exc))
 
     # ---- PHASE 2: SEND ----
-    for ep in endpoints:
+    for ep in active:
         est = stats.endpoint(ep.name)
         try:
             _send_endpoint(ep, store, http, log, est, batch_size)

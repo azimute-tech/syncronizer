@@ -67,3 +67,18 @@ the Windows service and starts it. The target machine needs nothing pre-installe
 
 To build locally instead (on a Windows box with Inno Setup 6):
 `pwsh packaging/build_installer.ps1` → `packaging/dist/syncronizer-setup.exe`.
+
+## Admin panel (configure after install)
+
+The installer asks for **nothing** — it just installs and starts the service. All
+configuration is done in a **local web panel** the service hosts at
+**http://127.0.0.1:8765** (Start Menu → *Syncronizer (Painel de controle)*). The panel:
+
+- edits every setting (Firebird path/credentials, API URL/key, intervals…) — paths
+  are normalized automatically, so `\` vs `/` and TOML escaping are never a problem;
+- shows the logs and the live status;
+- lists endpoints with **enable/disable** toggles and a **clear-and-resync** button;
+- has a **Restart** button to apply config changes.
+
+The service runs even with no configuration yet (ETL just waits), so the panel is
+always reachable. The panel binds to localhost only.

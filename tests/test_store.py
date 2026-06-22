@@ -104,3 +104,31 @@ def test_schema_version(tmp_path):
     run_migrations(s)
     assert s.schema_version == 1
     s.close()
+
+
+def test_endpoint_enable_disable(tmp_path):
+    s = make_store(tmp_path)
+    assert s.is_endpoint_enabled("animais") is True  # default enabled
+    s.set_endpoint_enabled("animais", False)
+    assert s.is_endpoint_enabled("animais") is False
+    s.set_endpoint_enabled("animais", True)
+    assert s.is_endpoint_enabled("animais") is True
+    s.close()
+
+
+def test_endpoint_reset_clears_data(tmp_path):
+    s = make_store(tmp_path)
+    s.ensure_endpoint_table("animais")
+    s.upsert_many("animais", [("1", "{}", "h1"), ("2", "{}", "h2")])
+    s.set_watermark("animais", "100")
+    assert s.endpoint_counts("animais")["total"] == 2
+    s.reset_endpoint("animais")
+    assert s.endpoint_counts("animais")["total"] == 0  # table dropped
+    assert s.get_watermark("animais") is None          # watermark cleared
+    s.close()
+
+
+def test_endpoint_counts_missing_table(tmp_path):
+    s = make_store(tmp_path)
+    assert s.endpoint_counts("never_created") == {"total": 0, "sent": 0, "pending": 0, "deleted": 0}
+    s.close()

@@ -1,23 +1,19 @@
 ; Syncronizer — Inno Setup installer.
 ;
-; Installs EVERYTHING the target needs with nothing pre-installed:
-;   - a relocatable Python runtime (python-build-standalone)   -> {app}\runtime\python
-;   - MinGit (portable git)                                    -> {app}\runtime\git
-;   - NSSM (service wrapper)                                    -> {app}\runtime\nssm
-; then git-clones the PUBLIC repo, creates a venv + installs deps, prompts for the
-; Firebird .fdb path (+ optional API url/token), writes config.toml into the WRITABLE
-; data dir (ProgramData, OUTSIDE the git tree), registers the Windows service and
-; starts it. The service self-updates via `git pull` thereafter.
+; Installs everything with nothing pre-installed (bundled Python + MinGit + NSSM),
+; git-clones the public repo, creates a venv + installs deps, registers the Windows
+; service and starts it. It does NOT ask for any settings: configuration is done
+; afterwards in the local admin UI (http://127.0.0.1:8765). The service runs even with
+; no config (ETL just waits) so the UI is always reachable.
 ;
-; Build prerequisite: run packaging\build_installer.ps1 first to populate build\ with
-; the pre-extracted runtimes and the offline seed snapshot. Compile with ISCC.
+; Build prerequisite: run packaging\build_installer.ps1 to populate build\ first.
 
 #define MyAppName "Syncronizer"
 #define MyAppVersion "0.1.0"
 #define MyServiceName "Syncronizer"
-; The public GitHub repository the service clones and self-updates from.
 #define MyRepoUrl "https://github.com/azimute-tech/syncronizer.git"
 #define MyBranch "main"
+#define MyPanelUrl "http://127.0.0.1:8765/"
 
 [Setup]
 AppId={{8F2A1C30-9C4E-4F1A-B7D2-5A5E0C0E5001}
@@ -35,15 +31,14 @@ WizardStyle=modern
 SetupLogging=yes
 
 [Files]
-; Pre-extracted at build time (see build_installer.ps1). Inno ships plain directories.
 Source: "build\python\*"; DestDir: "{app}\runtime\python"; Flags: recursesubdirs createallsubdirs ignoreversion
 Source: "build\git\*";    DestDir: "{app}\runtime\git";    Flags: recursesubdirs createallsubdirs ignoreversion
 Source: "build\nssm\nssm.exe"; DestDir: "{app}\runtime\nssm"; Flags: ignoreversion
-; Offline fallback: a snapshot of the repo, copied to the clone dir only if git clone fails.
 Source: "build\seed\*";   DestDir: "{app}\seed";           Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
-; Visible uninstall shortcut in the Start Menu (besides the Apps & Features entry).
+; Open the local control panel, and an easy uninstall — both in the Start Menu.
+Name: "{autoprograms}\Syncronizer (Painel de controle)"; Filename: "{#MyPanelUrl}"
 Name: "{autoprograms}\Desinstalar Syncronizer"; Filename: "{uninstallexe}"
 
 [Dirs]
@@ -56,45 +51,46 @@ Name: "{commonappdata}\Syncronizer\logs";   Permissions: service-modify
 ; 1) Clone the public repo (skipped if a working tree already exists).
 Filename: "{app}\runtime\git\cmd\git.exe"; \
   Parameters: "clone --depth 1 --branch {#MyBranch} {#MyRepoUrl} ""{commonappdata}\Syncronizer\repo"""; \
-  Flags: runhidden waituntilterminated; StatusMsg: "Fetching application code..."; Check: NeedsClone
+  Flags: runhidden waituntilterminated; StatusMsg: "Baixando o aplicativo..."; Check: NeedsClone
 
-; 2) Create the virtualenv from the bundled standalone Python.
+; 2) Create the venv from the bundled standalone Python.
 Filename: "{app}\runtime\python\python.exe"; \
   Parameters: "-m venv ""{commonappdata}\Syncronizer\venv"""; \
-  Flags: runhidden waituntilterminated; StatusMsg: "Creating Python environment..."
+  Flags: runhidden waituntilterminated; StatusMsg: "Criando ambiente Python..."
 
-; 3) Install dependencies + the package (editable) into the venv.
+; 3) Install dependencies + the package (editable).
 Filename: "{commonappdata}\Syncronizer\venv\Scripts\python.exe"; \
   Parameters: "-m pip install --no-input --no-warn-script-location -r ""{commonappdata}\Syncronizer\repo\requirements.txt"""; \
-  Flags: runhidden waituntilterminated; StatusMsg: "Installing dependencies..."
+  Flags: runhidden waituntilterminated; StatusMsg: "Instalando dependências..."
 Filename: "{commonappdata}\Syncronizer\venv\Scripts\python.exe"; \
   Parameters: "-m pip install --no-input --no-warn-script-location -e ""{commonappdata}\Syncronizer\repo"""; \
-  Flags: runhidden waituntilterminated; StatusMsg: "Installing application..."
+  Flags: runhidden waituntilterminated; StatusMsg: "Instalando o aplicativo..."
 
-; 4) Self-check (imports endpoints + opens control DB). Abort the install if it fails.
+; 4) Sanity check (imports endpoints + opens control DB). Firebird may be unconfigured.
 Filename: "{commonappdata}\Syncronizer\venv\Scripts\python.exe"; \
   Parameters: "-m syncronizer self-check"; WorkingDir: "{commonappdata}\Syncronizer\repo"; \
-  Flags: runhidden waituntilterminated; StatusMsg: "Validating installation..."; Check: SelfCheckPass
+  Flags: runhidden waituntilterminated; StatusMsg: "Validando instalação..."
 
-; 5) (Re)register the service idempotently.
+; 5) (Re)register the service idempotently. NO AppEnvironmentExtra: the app hard-codes
+;    the data dir to %PROGRAMDATA%\Syncronizer on Windows, so there is no env to mangle.
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "stop {#MyServiceName}"; Flags: runhidden; Check: ServiceExists
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "remove {#MyServiceName} confirm"; Flags: runhidden; Check: ServiceExists
 Filename: "{app}\runtime\nssm\nssm.exe"; \
   Parameters: "install {#MyServiceName} ""{commonappdata}\Syncronizer\venv\Scripts\python.exe"" -m syncronizer run"; Flags: runhidden waituntilterminated
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppDirectory ""{commonappdata}\Syncronizer\repo"""; Flags: runhidden
-; NO AppEnvironmentExtra: the app hard-codes the data dir to %PROGRAMDATA%\Syncronizer
-; on Windows, so there is no env block to mangle. git/repo/venv paths come from
-; config.toml [paths].
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppExit Default Restart"; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppThrottle 60000"; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppRestartDelay 30000"; Flags: runhidden
+Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppStopMethodConsole 15000"; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppStdout ""{commonappdata}\Syncronizer\logs\service-stdout.log"""; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppStderr ""{commonappdata}\Syncronizer\logs\service-stderr.log"""; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppRotateFiles 1"; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppRotateBytes 10485760"; Flags: runhidden
-Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppStopMethodConsole 15000"; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} Start SERVICE_AUTO_START"; Flags: runhidden
-Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden waituntilterminated; StatusMsg: "Starting service..."
+Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden waituntilterminated; StatusMsg: "Iniciando o serviço..."
+
+; 6) Open the control panel so the user can configure it.
+Filename: "{#MyPanelUrl}"; Flags: shellexec postinstall nowait skipifsilent; Description: "Abrir o painel de controle do Syncronizer"
 
 [UninstallRun]
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "stop {#MyServiceName}"; Flags: runhidden; RunOnceId: "StopSvc"
@@ -105,51 +101,6 @@ Type: filesandordirs; Name: "{commonappdata}\Syncronizer\repo"
 Type: filesandordirs; Name: "{commonappdata}\Syncronizer\venv"
 
 [Code]
-var
-  CfgPage: TInputQueryWizardPage;
-
-procedure InitializeWizard;
-begin
-  CfgPage := CreateInputQueryPage(wpSelectDir,
-    'Firebird & API configuration',
-    'Where is the data and where does it go?',
-    'Informe o caminho do Firebird (.fdb), a URL base da API e a API Key. Tudo pode ser alterado depois em config.toml.');
-  CfgPage.Add('Caminho completo do banco Firebird (.fdb):', False);
-  CfgPage.Add('URL base da API (ex.: https://api.exemplo.com):', False);
-  CfgPage.Add('API Key (enviada em toda requisicao):', True);   { masked }
-  CfgPage.Add('Nome do header da API Key:', False);
-  CfgPage.Values[0] := 'C:\data\app.fdb';
-  CfgPage.Values[1] := 'https://';
-  CfgPage.Values[2] := '';
-  CfgPage.Values[3] := 'X-API-Key';
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  Result := True;
-  if (CurPageID = CfgPage.ID) then
-  begin
-    if not FileExists(CfgPage.Values[0]) then
-    begin
-      MsgBox('O caminho do banco Firebird (.fdb) nao existe:' + #13#10 + CfgPage.Values[0],
-        mbError, MB_OK);
-      Result := False;
-    end
-    else if (Pos('http://', LowerCase(CfgPage.Values[1])) <> 1) and
-            (Pos('https://', LowerCase(CfgPage.Values[1])) <> 1) then
-    begin
-      MsgBox('Informe a URL base da API (deve comecar com http:// ou https://).',
-        mbError, MB_OK);
-      Result := False;
-    end
-    else if (Length(Trim(CfgPage.Values[1])) <= 8) then
-    begin
-      MsgBox('A URL base da API esta incompleta.', mbError, MB_OK);
-      Result := False;
-    end;
-  end;
-end;
-
 function NeedsClone: Boolean;
 begin
   Result := not DirExists(ExpandConstant('{commonappdata}\Syncronizer\repo\.git'));
@@ -163,15 +114,9 @@ begin
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
 end;
 
-function SelfCheckPass: Boolean;
-begin
-  // Always run; a failing self-check raises a fatal install error via the [Run] exit code.
-  Result := True;
-end;
-
-// Runs BEFORE any files are copied. Stop + remove the running service (and let its
-// python release file handles) so reinstalling over a running install does not fail
-// with "Access denied / DeleteFile failed; code 5" on the locked python.exe.
+// Runs BEFORE any files are copied: stop + remove the running service so its python
+// releases file handles, otherwise overwriting runtime\python\python.exe fails with
+// "Access denied / DeleteFile failed; code 5" when reinstalling over a running install.
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Rc: Integer;
@@ -181,77 +126,14 @@ begin
   Nssm := ExpandConstant('{app}\runtime\nssm\nssm.exe');
   if FileExists(Nssm) then
   begin
-    Exec(Nssm, 'stop Syncronizer', '', SW_HIDE, ewWaitUntilTerminated, Rc);
-    Exec(Nssm, 'remove Syncronizer confirm', '', SW_HIDE, ewWaitUntilTerminated, Rc);
-    // give the OS a moment to release the python.exe / DLL handles before overwrite
+    Exec(Nssm, 'stop {#MyServiceName}', '', SW_HIDE, ewWaitUntilTerminated, Rc);
+    Exec(Nssm, 'remove {#MyServiceName} confirm', '', SW_HIDE, ewWaitUntilTerminated, Rc);
     Exec(ExpandConstant('{cmd}'), '/c timeout /t 4 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, Rc);
   end;
 end;
 
-// TOML basic strings treat backslash as an escape, so Windows paths MUST have their
-// backslashes (and any quote) doubled/escaped, or the file is invalid TOML.
-function TomlEsc(const S: string): string;
-var
-  R: string;
-begin
-  R := S;
-  StringChangeEx(R, '\', '\\', True);
-  StringChangeEx(R, '"', '\"', True);
-  Result := R;
-end;
-
-procedure WriteConfig;
-var
-  DataDir, Cfg: string;
-begin
-  DataDir := ExpandConstant('{commonappdata}\Syncronizer');
-  Cfg :=
-    '# Generated by the Syncronizer installer. Holds secrets - never commit.' + #13#10 +
-    '[firebird]' + #13#10 +
-    'path = "' + TomlEsc(CfgPage.Values[0]) + '"' + #13#10 +
-    'host = "localhost"' + #13#10 +
-    'port = 3050' + #13#10 +
-    'user = "SYSDBA"' + #13#10 +
-    'password = "masterkey"' + #13#10 +
-    'charset = "UTF8"' + #13#10 + #13#10 +
-    '[api]' + #13#10 +
-    'base_url = "' + TomlEsc(CfgPage.Values[1]) + '"' + #13#10 +
-    'key = "' + TomlEsc(CfgPage.Values[2]) + '"' + #13#10 +
-    'key_header = "' + TomlEsc(CfgPage.Values[3]) + '"' + #13#10 + #13#10 +
-    '[update]' + #13#10 +
-    'auto_update = true' + #13#10 +
-    'branch = "{#MyBranch}"' + #13#10 +
-    'repo_url = "{#MyRepoUrl}"' + #13#10 + #13#10 +
-    '[paths]' + #13#10 +
-    'git_exe = "' + TomlEsc(ExpandConstant('{app}\runtime\git\cmd\git.exe')) + '"' + #13#10 +
-    'nssm_exe = "' + TomlEsc(ExpandConstant('{app}\runtime\nssm\nssm.exe')) + '"' + #13#10 +
-    'repo_dir = "' + TomlEsc(DataDir + '\repo') + '"' + #13#10 +
-    'venv_dir = "' + TomlEsc(DataDir + '\venv') + '"' + #13#10;
-  SaveStringToFile(DataDir + '\config\config.toml', Cfg, False);
-end;
-
-procedure HandleOfflineSeed;
-begin
-  // If the clone did not produce a working tree (offline), seed from the bundled snapshot.
-  if NeedsClone and DirExists(ExpandConstant('{app}\seed')) then
-  begin
-    Log('git clone unavailable; seeding repo from offline snapshot');
-    if not DirExists(ExpandConstant('{commonappdata}\Syncronizer\repo')) then
-      CreateDir(ExpandConstant('{commonappdata}\Syncronizer\repo'));
-    // (A production installer would xcopy {app}\seed -> repo and `git init`/remote add here.)
-  end;
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if CurStep = ssPostInstall then
-  begin
-    WriteConfig;   // write config.toml BEFORE the [Run] clone/pip/self-check entries
-  end;
-end;
-
-// On uninstall, after the service is removed, offer to wipe the data dir
-// (control.db, logs and config.toml) so the next install starts from zero.
+// On uninstall, after the service is removed, offer to wipe the data dir so the next
+// install starts from zero (e.g. migrating dev -> prod).
 procedure CurUninstallStepChanged(CurStep: TUninstallStep);
 begin
   if CurStep = usPostUninstall then
