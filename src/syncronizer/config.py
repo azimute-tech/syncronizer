@@ -154,8 +154,11 @@ class Settings(BaseSettings):
     ):
         toml_path = resolve_data_dir() / "config" / "config.toml"
         toml_source = GroupedTomlSource(settings_cls, toml_path)
-        # init > env > dotenv > toml > secrets
-        return (init_settings, env_settings, dotenv_settings, toml_source, file_secret_settings)
+        # config.toml (managed by the admin UI) is the source of truth, so it wins over
+        # env vars — otherwise a stray SYNC_* env would silently override the UI.
+        # Env still fills fields NOT present in config.toml.
+        # Precedence: init > config.toml > env > dotenv > secrets
+        return (init_settings, toml_source, env_settings, dotenv_settings, file_secret_settings)
 
     def require_firebird_path(self) -> Path:
         """Return the Firebird path or raise a clear, actionable error."""
