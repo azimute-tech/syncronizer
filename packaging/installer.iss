@@ -42,6 +42,10 @@ Source: "build\nssm\nssm.exe"; DestDir: "{app}\runtime\nssm"; Flags: ignoreversi
 ; Offline fallback: a snapshot of the repo, copied to the clone dir only if git clone fails.
 Source: "build\seed\*";   DestDir: "{app}\seed";           Flags: recursesubdirs createallsubdirs ignoreversion
 
+[Icons]
+; Visible uninstall shortcut in the Start Menu (besides the Apps & Features entry).
+Name: "{autoprograms}\Desinstalar Syncronizer"; Filename: "{uninstallexe}"
+
 [Dirs]
 Name: "{commonappdata}\Syncronizer";        Permissions: service-modify
 Name: "{commonappdata}\Syncronizer\config"; Permissions: service-modify
@@ -78,11 +82,9 @@ Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "remove {#MyServiceName} co
 Filename: "{app}\runtime\nssm\nssm.exe"; \
   Parameters: "install {#MyServiceName} ""{commonappdata}\Syncronizer\venv\Scripts\python.exe"" -m syncronizer run"; Flags: runhidden waituntilterminated
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppDirectory ""{commonappdata}\Syncronizer\repo"""; Flags: runhidden
-; ONLY SYNCRONIZER_DATA_DIR (no spaces). Passing multiple space-containing values
-; (C:\Program Files\...) to NSSM AppEnvironmentExtra mangles the env block and breaks
-; SYNCRONIZER_DATA_DIR, so the service can't find its config. The git/repo/venv paths
-; are read from config.toml [paths] instead.
-Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppEnvironmentExtra SYNCRONIZER_DATA_DIR={commonappdata}\Syncronizer"; Flags: runhidden
+; NO AppEnvironmentExtra: the app hard-codes the data dir to %PROGRAMDATA%\Syncronizer
+; on Windows, so there is no env block to mangle. git/repo/venv paths come from
+; config.toml [paths].
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppExit Default Restart"; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppThrottle 60000"; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppRestartDelay 30000"; Flags: runhidden
