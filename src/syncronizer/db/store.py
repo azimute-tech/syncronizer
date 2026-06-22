@@ -228,6 +228,56 @@ class ControlStore:
                 (endpoint, last_send_at, status),
             )
 
+    # -- endpoint enable/disable + reset (admin UI) ------------------------
+    def is_endpoint_enabled(self, name: str) -> bool:
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT enabled FROM _endpoint_config WHERE endpoint=?", (name,)
+            ).fetchone()
+            return True if row is None else bool(row[0])  # default: enabled
+
+    def set_endpoint_enabled(self, name: str, enabled: bool) -> None:
+        with self._lock, self.conn:
+            self.conn.execute(
+                "INSERT INTO _endpoint_config(endpoint, enabled) VALUES(?, ?) "
+                "ON CONFLICT(endpoint) DO UPDATE SET enabled=excluded.enabled",
+                (name, 1 if enabled else 0),
+            )
+
+    def reset_endpoint(self, name: str) -> None:
+        """Clear all synced data for an endpoint so the next cycle re-extracts and
+        re-sends everything from scratch."""
+        table = schema.table_for(name)
+        with self._lock, self.conn:
+            self.conn.execute(f"DROP TABLE IF EXISTS {table}")
+            self.conn.execute("DELETE FROM _endpoint_state WHERE endpoint=?", (name,))
+
+    def endpoint_counts(self, name: str) -> Dict[str, int]:
+        table = schema.table_for(name)
+        with self._lock:
+            exists = self.conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ).fetchone()
+            if not exists:
+                return {"total": 0, "sent": 0, "pending": 0, "deleted": 0}
+            g = lambda q: self.conn.execute(q).fetchone()[0]  # noqa: E731
+            return {
+                "total": g(f"SELECT COUNT(*) FROM {table}"),
+                "sent": g(f"SELECT COUNT(*) FROM {table} WHERE sent=1"),
+                "pending": g(f"SELECT COUNT(*) FROM {table} WHERE sent=0"),
+                "deleted": g(f"SELECT COUNT(*) FROM {table} WHERE deleted=1"),
+            }
+
+    def last_endpoint_state(self, name: str) -> dict:
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT last_etl_at, last_send_at, last_status FROM _endpoint_state WHERE endpoint=?",
+                (name,),
+            ).fetchone()
+        if not row:
+            return {"last_etl_at": None, "last_send_at": None, "last_status": None}
+        return {"last_etl_at": row[0], "last_send_at": row[1], "last_status": row[2]}
+
     # -- run log -----------------------------------------------------------
     def log_run(self, endpoint: Optional[str], phase: str, **counts) -> None:
         with self._lock, self.conn:

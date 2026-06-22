@@ -82,6 +82,15 @@ def build_paths(settings, data_dir: Path | None = None) -> Paths:
             val = os.environ.get(env_key)
         return Path(val).resolve() if val else default
 
+    # On Windows, derive the bundled runtime by install convention so config.toml
+    # never needs a [paths] section (which kept getting mangled).
+    git_default = nssm_default = None
+    if os.name == "nt":
+        pf = Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Syncronizer" / "runtime"
+        g, n = pf / "git" / "cmd" / "git.exe", pf / "nssm" / "nssm.exe"
+        git_default = g if g.exists() else None
+        nssm_default = n if n.exists() else None
+
     return Paths(
         data_dir=data_dir,
         config_dir=config_dir,
@@ -96,6 +105,6 @@ def build_paths(settings, data_dir: Path | None = None) -> Paths:
         quarantine=state_dir / "quarantine.json",
         repo_dir=_override("repo_dir", "SYNCRONIZER_REPO_DIR", data_dir / "repo"),
         venv_dir=_override("venv_dir", "SYNCRONIZER_VENV_DIR", data_dir / "venv"),
-        git_exe=_override("git_exe", "SYNCRONIZER_GIT_EXE", None),
-        nssm_exe=_override("nssm_exe", "SYNCRONIZER_NSSM_EXE", None),
+        git_exe=_override("git_exe", "SYNCRONIZER_GIT_EXE", git_default),
+        nssm_exe=_override("nssm_exe", "SYNCRONIZER_NSSM_EXE", nssm_default),
     )

@@ -118,6 +118,11 @@ class Settings(BaseSettings):
     misfire_grace_time: int = 300
     run_on_start: bool = True
 
+    # --- local admin UI (localhost only) ---
+    admin_enabled: bool = True
+    admin_host: str = "127.0.0.1"
+    admin_port: int = 8765
+
     # --- self-update (git sync) ---
     auto_update: bool = True
     update_branch: str = "main"
