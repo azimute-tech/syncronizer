@@ -63,6 +63,7 @@ PAGE = r"""<!doctype html>
 <script>
 const $ = s => document.querySelector(s);
 let STATE = null;
+let configRendered = false;   // render the config form ONCE so auto-refresh never wipes typing
 function toast(msg, ms=2500){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), ms); }
 async function api(path, opts){ const r = await fetch(path, opts); if(!r.ok) throw new Error(await r.text()); const ct=r.headers.get('content-type')||''; return ct.includes('json')? r.json(): r.text(); }
 
@@ -79,7 +80,8 @@ async function refresh(){
   $('#svc').textContent = 'Serviço: ' + s.service; $('#svc').className='pill ok';
   $('#fb').textContent = 'Firebird: ' + (s.firebird_configured ? (s.firebird_ok?'OK':'configurado') : 'NÃO configurado');
   $('#fb').className = 'pill ' + (s.firebird_ok?'ok':(s.firebird_configured?'warn':'warn'));
-  renderStatus(); renderConfig(); renderEndpoints();
+  renderStatus(); renderEndpoints();
+  if(!configRendered){ renderConfig(); configRendered=true; }   // never re-render while editing
 }
 
 function renderStatus(){
@@ -110,7 +112,7 @@ function renderConfig(){
   $('#tab-config').innerHTML = html;
 }
 function collectConfig(){ const out={}; STATE.config.forEach(f=>{ const el=$('#cfg_'+f.key); out[f.key]= f.type==='bool'? el.checked : el.value; }); return out; }
-async function saveConfig(){ await api('/api/config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(collectConfig())}); toast('Configuração salva. Reinicie para aplicar.'); refresh(); }
+async function saveConfig(){ await api('/api/config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(collectConfig())}); toast('Configuração salva. Reinicie para aplicar.'); configRendered=false; refresh(); }
 async function saveAndRestart(){ await api('/api/config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(collectConfig())}); toast('Salvo. Reiniciando…'); setTimeout(restart, 400); }
 
 function renderEndpoints(){
@@ -134,7 +136,9 @@ async function epReset(name){ if(!confirm('Limpar TODOS os dados de "'+name+'" e
 async function loadLogs(){ const txt = await api('/api/logs?n=300'); $('#tab-logs').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><h2>Logs</h2><button class="btn sec small" onclick="loadLogs()">Atualizar</button></div><pre class="log">${txt.replace(/[&<]/g,c=>({'&':'&amp;','<':'&lt;'}[c]))}</pre></div>`; const p=$('#tab-logs pre'); if(p) p.scrollTop=p.scrollHeight; }
 async function restart(){ try{ await api('/api/restart',{method:'POST'}); }catch(e){} toast('Reiniciando o serviço… recarregue em ~20s.'); }
 
-refresh(); setInterval(()=>{ if(!$('#tab-logs').hidden) return; refresh(); }, 15000);
+refresh();
+// auto-refresh status/endpoints, but NEVER while the Config or Logs tab is open
+setInterval(()=>{ if(!$('#tab-config').hidden || !$('#tab-logs').hidden) return; refresh(); }, 15000);
 </script>
 </body></html>
 """
