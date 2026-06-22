@@ -19,15 +19,20 @@ ENV_DATA_DIR = "SYNCRONIZER_DATA_DIR"
 def resolve_data_dir() -> Path:
     """Resolve the writable data root.
 
-    Order: ``$SYNCRONIZER_DATA_DIR`` -> ``%PROGRAMDATA%\\Syncronizer`` on Windows ->
-    ``./data`` for local development.
+    On Windows the data dir is FIXED at ``%PROGRAMDATA%\\Syncronizer`` and the
+    ``SYNCRONIZER_DATA_DIR`` env var is deliberately IGNORED: a service environment
+    block can get mangled (e.g. NSSM AppEnvironmentExtra with space-containing values),
+    and a wrong data dir means the service can't find its config. Hard-coding the
+    Windows location removes that whole class of failure.
+
+    The env override remains available for non-Windows development.
     """
-    env = os.environ.get(ENV_DATA_DIR)
-    if env:
-        return Path(env).expanduser().resolve()
     if os.name == "nt":
         base = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
         return (Path(base) / "Syncronizer").resolve()
+    env = os.environ.get(ENV_DATA_DIR)
+    if env:
+        return Path(env).expanduser().resolve()
     return (Path.cwd() / "data").resolve()
 
 
