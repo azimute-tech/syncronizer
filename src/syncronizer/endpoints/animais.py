@@ -190,6 +190,15 @@ class AnimaisEndpoint(Endpoint):
                     else:
                         ok.append(pk)
             except Exception as exc:  # noqa: BLE001 - whole chunk retries next cycle
+                # capture the API response body so the reason is actionable
+                # (status + e.g. which field/animal the API rejected, 401, 429, ...)
+                detail = str(exc)
+                resp = getattr(exc, "response", None)
+                if resp is not None:
+                    try:
+                        detail = f"{resp.status_code}: {resp.text[:300]}"
+                    except Exception:  # noqa: BLE001
+                        pass
                 for pk, _ in chunk:
-                    failed.append((pk, f"http: {exc}"))
+                    failed.append((pk, f"http: {detail}"))
         return SendResult(ok, failed)
