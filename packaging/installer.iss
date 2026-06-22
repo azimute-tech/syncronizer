@@ -166,6 +166,25 @@ begin
   Result := True;
 end;
 
+// Runs BEFORE any files are copied. Stop + remove the running service (and let its
+// python release file handles) so reinstalling over a running install does not fail
+// with "Access denied / DeleteFile failed; code 5" on the locked python.exe.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Rc: Integer;
+  Nssm: String;
+begin
+  Result := '';
+  Nssm := ExpandConstant('{app}\runtime\nssm\nssm.exe');
+  if FileExists(Nssm) then
+  begin
+    Exec(Nssm, 'stop Syncronizer', '', SW_HIDE, ewWaitUntilTerminated, Rc);
+    Exec(Nssm, 'remove Syncronizer confirm', '', SW_HIDE, ewWaitUntilTerminated, Rc);
+    // give the OS a moment to release the python.exe / DLL handles before overwrite
+    Exec(ExpandConstant('{cmd}'), '/c timeout /t 4 /nobreak', '', SW_HIDE, ewWaitUntilTerminated, Rc);
+  end;
+end;
+
 // TOML basic strings treat backslash as an escape, so Windows paths MUST have their
 // backslashes (and any quote) doubled/escaped, or the file is invalid TOML.
 function TomlEsc(const S: string): string;
