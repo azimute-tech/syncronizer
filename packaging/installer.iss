@@ -78,10 +78,11 @@ Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "remove {#MyServiceName} co
 Filename: "{app}\runtime\nssm\nssm.exe"; \
   Parameters: "install {#MyServiceName} ""{commonappdata}\Syncronizer\venv\Scripts\python.exe"" -m syncronizer run"; Flags: runhidden waituntilterminated
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppDirectory ""{commonappdata}\Syncronizer\repo"""; Flags: runhidden
-; Set the data dir AND the bundled git/nssm locations (in Program Files, with spaces)
-; so the early boot gate can find git before config.toml is even loaded. Each KEY=VALUE
-; is quoted as one token; NSSM accepts multiple AppEnvironmentExtra entries.
-Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppEnvironmentExtra ""SYNCRONIZER_DATA_DIR={commonappdata}\Syncronizer"" ""SYNCRONIZER_REPO_DIR={commonappdata}\Syncronizer\repo"" ""SYNCRONIZER_VENV_DIR={commonappdata}\Syncronizer\venv"" ""SYNCRONIZER_GIT_EXE={app}\runtime\git\cmd\git.exe"" ""SYNCRONIZER_NSSM_EXE={app}\runtime\nssm\nssm.exe"""; Flags: runhidden
+; ONLY SYNCRONIZER_DATA_DIR (no spaces). Passing multiple space-containing values
+; (C:\Program Files\...) to NSSM AppEnvironmentExtra mangles the env block and breaks
+; SYNCRONIZER_DATA_DIR, so the service can't find its config. The git/repo/venv paths
+; are read from config.toml [paths] instead.
+Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppEnvironmentExtra SYNCRONIZER_DATA_DIR={commonappdata}\Syncronizer"; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppExit Default Restart"; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppThrottle 60000"; Flags: runhidden
 Filename: "{app}\runtime\nssm\nssm.exe"; Parameters: "set {#MyServiceName} AppRestartDelay 30000"; Flags: runhidden
