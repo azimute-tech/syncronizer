@@ -46,3 +46,27 @@ def test_flat_config_is_read_by_settings_loader(tmp_path, monkeypatch):
     s = load_settings()
     assert s.cycle_minutes == 3
     assert str(s.firebird_path).endswith("x.fdb")
+
+
+def test_ui_config_wins_over_env(tmp_path, monkeypatch):
+    # the UI's config.toml must win over a stray SYNC_* env var
+    cfgdir = tmp_path / "config"
+    cfgdir.mkdir()
+    configio.write_flat(cfgdir / "config.toml", {"cycle_minutes": 1})
+    monkeypatch.setenv("SYNCRONIZER_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("SYNC_CYCLE_MINUTES", "5")
+    from syncronizer.config import load_settings
+    assert load_settings().cycle_minutes == 1
+
+
+def test_env_still_fills_fields_absent_from_config(tmp_path, monkeypatch):
+    # a field NOT in config.toml still falls back to env
+    cfgdir = tmp_path / "config"
+    cfgdir.mkdir()
+    configio.write_flat(cfgdir / "config.toml", {"cycle_minutes": 2})
+    monkeypatch.setenv("SYNCRONIZER_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("SYNC_BATCH_SIZE", "999")
+    from syncronizer.config import load_settings
+    s = load_settings()
+    assert s.cycle_minutes == 2   # from config
+    assert s.batch_size == 999    # from env (absent in config)
