@@ -28,3 +28,5 @@ dist/
 /packaging/build/
 /packaging/dist/
 *.exe
+# ...but DO vendor NSSM (nssm.cc is flaky; commit it so the build is deterministic)
+!/packaging/vendor/nssm.exe
