@@ -31,6 +31,11 @@ def _log_tail(path, n: int) -> str:
 def build_state(app) -> dict:
     s = app.settings
     effective = json.loads(s.model_dump_json())
+    # The config form must reflect what's SAVED in config.toml (the persisted, editable
+    # state) — NOT the in-memory settings loaded at service start. app.settings only
+    # reloads config.toml on restart, so without this a value saved without restarting
+    # appears to "revert" on the next form render. Saved values override startup defaults.
+    form_values = {**effective, **configio.read_flat(app.paths.config_file)}
     totals = {"total": 0, "sent": 0, "pending": 0, "deleted": 0}
     endpoints = []
     for ep in app.endpoints:
@@ -53,7 +58,7 @@ def build_state(app) -> dict:
         "api_configured": bool(s.api_base_url and (s.api_key or s.api_token)),
         "totals": totals,
     }
-    return {"status": status, "config": configio.form_model(effective), "endpoints": endpoints}
+    return {"status": status, "config": configio.form_model(form_values), "endpoints": endpoints}
 
 
 def _make_handler(app):
