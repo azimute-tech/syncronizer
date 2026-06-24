@@ -97,6 +97,34 @@ def test_send_failure_keeps_row_unsent(tmp_path):
     store.close()
 
 
+def test_send_drains_whole_queue_in_one_cycle(tmp_path):
+    """SEND flushes the entire backlog per cycle (not just batch_size), and a row that
+    fails stays unsent without blocking the rows behind it."""
+    store = ControlStore(tmp_path / "c.db")
+
+    class FailingHTTP:
+        def __init__(self, bad):
+            self.bad = bad
+            self.calls = []
+
+        def request(self, method, path, json=None):
+            self.calls.append((method, path, json))
+            if json and str(json.get("id")) in self.bad:
+                raise RuntimeError("boom")
+
+    ep = Produtos()
+    rows = [{"ID": i, "PRECO": i} for i in range(1, 6)]  # 5 rows
+    http = FailingHTTP(bad={"3"})
+    # batch_size=2 < 5 pending -> must still drain ALL 5 this cycle (3 pages)
+    stats = orchestrator.run_cycle([ep], FakeFB(rows), store, http, LOG, 2)
+    est = stats.endpoint("produtos")
+    assert (est.sent, est.failed) == (4, 1)
+    assert len(http.calls) == 5  # every row attempted in one cycle
+    # only the failing row remains pending; it did not block the others
+    assert [r["pk"] for r in store.select_unsent("produtos", 10)] == ["3"]
+    store.close()
+
+
 def test_reconcile_deletes_through_cycle(tmp_path):
     store = ControlStore(tmp_path / "c.db")
 

@@ -138,21 +138,35 @@ def _etl_endpoint(ep: Endpoint, fb, store, log, est: EndpointStats) -> None:
 
 
 def _send_endpoint(ep: Endpoint, store, http, log, est: EndpointStats, batch_size: int) -> None:
+    """Drain the endpoint's whole send queue this cycle, page by page (``batch_size``),
+    until nothing pending is left. The ETL runs once per cycle, but the SEND flushes
+    everything: a row that fails stays unsent (visible, retried next cycle) yet never
+    blocks the rows behind it, because the cursor advances past it within the pass."""
     store.ensure_endpoint_table(ep.name)
-    rows = store.select_unsent(ep.name, batch_size)
-    if not rows:
-        return
-    result = ep.send(http, rows)
-    if result.ok:
-        store.mark_sent(ep.name, result.ok)
-        est.sent = len(result.ok)
-    for pk, err in result.failed:
-        store.mark_failed(ep.name, pk, err)
-    est.failed = len(result.failed)
-    if result.failed:
-        reasons = collections.Counter(str(err)[:160] for _, err in result.failed)
-        for reason, n in reasons.most_common(3):
+    total_ok = 0
+    total_failed = 0
+    failures = collections.Counter()
+    after_pk = None
+    while True:
+        rows = store.select_unsent(ep.name, batch_size, after_pk=after_pk)
+        if not rows:
+            break
+        after_pk = rows[-1]["pk"]  # forward cursor: failed rows don't re-loop this pass
+        result = ep.send(http, rows)
+        if result.ok:
+            store.mark_sent(ep.name, result.ok)
+            total_ok += len(result.ok)
+        for pk, err in result.failed:
+            store.mark_failed(ep.name, pk, err)
+            failures[str(err)[:160]] += 1
+        total_failed += len(result.failed)
+
+    est.sent = total_ok
+    est.failed = total_failed
+    if total_failed:
+        for reason, n in failures.most_common(3):
             log.warning("[%s] envio falhou (%dx): %s", ep.name, n, reason)
-    status = "ok" if not result.failed else "partial"
-    store.touch_endpoint(ep.name, last_send_at=now_iso(), status=status)
-    store.log_run(ep.name, "send", sent=est.sent, failed=est.failed, status=status)
+    if total_ok or total_failed:
+        status = "ok" if not total_failed else "partial"
+        store.touch_endpoint(ep.name, last_send_at=now_iso(), status=status)
+        store.log_run(ep.name, "send", sent=total_ok, failed=total_failed, status=status)
