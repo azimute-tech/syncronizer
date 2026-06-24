@@ -38,15 +38,10 @@ def test_transform_keeps_real_exit_and_lote_fallback():
     assert r["LOTE_ATUAL"] == "10001"  # falls back to LOTE_ENTRADA when null
 
 
-def test_validate_rejects_bad_data():
-    ep = AnimaisEndpoint()
-    good = ep.transform(_row(DATA_ENTRADA=date(2020, 1, 1)))
-    assert ep._validate(good) is None
-    assert ep._validate({**good, "PESO_BALANCINHA": 0}) is not None
-    assert ep._validate({**good, "RC_ENTRADA": 150}) is not None
-    assert ep._validate({**good, "IDADE": 999}) is not None
-    assert ep._validate({**good, "DATA_ENTRADA": "2999-01-01"}) is not None  # future
-    assert ep._validate({**good, "USUARIO": ""}) is not None
+def test_extract_spec_builds_query():
+    from syncronizer.core.extract import ExtractContext
+    spec = AnimaisEndpoint().extract_spec(ExtractContext(last_watermark=None))
+    assert "CAD_ANIMAL" in spec.sql and spec.params == ()
 
 
 class _Resp:
@@ -87,11 +82,14 @@ def test_send_batches_and_reconciles_per_item_errors():
     assert isinstance(body["animais"], list) and len(body["animais"]) == 3
 
 
-def test_send_drops_locally_invalid_without_sinking_batch():
+def test_send_sends_everything_including_quality_issues():
+    """No local quality gate: an animal the API may dislike (peso 0, RC 150) is still
+    POSTed — the destination surfaces it and the fix happens in TGC."""
     ep = AnimaisEndpoint()
-    bad = {"pk": "9", "payload": json.dumps({"COD_ANIMAL": "9", "PESO_BALANCINHA": 0}), "deleted": False}
-    http = _Http({"inserted": 1, "updated": 0, "errors": []})
-    res = ep.send(http, [_unsent(1), bad])
-    assert "1" in res.ok
-    assert any(pk == "9" for pk, _ in res.failed)
-    assert len(http.calls[0][2]["animais"]) == 1  # only the valid one was POSTed
+    quality_issue = {"pk": "9",
+                     "payload": json.dumps({"COD_ANIMAL": "9", "PESO_BALANCINHA": 0, "RC_ENTRADA": 150}),
+                     "deleted": False}
+    http = _Http({"inserted": 2, "updated": 0, "errors": []})
+    res = ep.send(http, [_unsent(1), quality_issue])
+    assert set(res.ok) == {"1", "9"}                  # nothing dropped locally
+    assert len(http.calls[0][2]["animais"]) == 2      # the "bad" animal was POSTed too

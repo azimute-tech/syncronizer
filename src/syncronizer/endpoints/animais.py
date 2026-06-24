@@ -5,21 +5,21 @@ Target: POST /api/integracoes/tgc/animais  body {"animais": [ ... ]} (1..500 ite
 Auth:   X-API-Key (or Authorization: Bearer) = per-farm TGC token. farm_id comes from
         the token server-side and is NOT sent in the body.
 
-The API validates the WHOLE batch with zod (a single invalid item 400s the batch), then
-upserts and returns 200 {inserted, updated, errors:[{cod_animal, message}]}. So send()
-here validates each animal locally first (drops invalid ones so they never sink a good
-batch), POSTs in chunks, and reconciles per-item failures by COD_ANIMAL.
+The API upserts and returns 200 {inserted, updated, errors:[{cod_animal, message}]}. So
+send() here POSTs in chunks and reconciles per-item failures by COD_ANIMAL.
+
+Data-quality problems (RC_ENTRADA > 100, duplicate SISBOV, ...) are NOT filtered out
+locally — every animal is sent so the destination surfaces the issue. Corrections happen
+in the source (TGC); the next sync detects the changed row (by COD_ANIMAL within the farm)
+and re-sends it with the corrected value.
 """
 from __future__ import annotations
 
 import json
-import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 
 from syncronizer.core.endpoint import Endpoint, SendResult
 from syncronizer.core.extract import ExtractContext, ExtractSpec
-
-_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _req_str(value):
@@ -138,45 +138,17 @@ class AnimaisEndpoint(Endpoint):
                 record[key] = val
         return record
 
-    # --- local validation mirroring the API's zod rules ---
-    @staticmethod
-    def _validate(a: dict):
-        for field in ("COD_ANIMAL", "LOTE_ENTRADA", "LOTE_ATUAL", "USUARIO"):
-            if not a.get(field):
-                return f"{field} vazio"
-        peso = a.get("PESO_BALANCINHA")
-        if not isinstance(peso, (int, float)) or peso <= 0:
-            return f"PESO_BALANCINHA inválido ({peso})"
-        rc = a.get("RC_ENTRADA")
-        if not isinstance(rc, (int, float)) or rc <= 0 or rc > 100:
-            return f"RC_ENTRADA inválido ({rc})"
-        idade = a.get("IDADE")
-        if not isinstance(idade, int) or idade < 0 or idade > 480:
-            return f"IDADE inválida ({idade})"
-        data = a.get("DATA_ENTRADA")
-        if not isinstance(data, str) or not _DATE_RE.match(data):
-            return f"DATA_ENTRADA inválida ({data})"
-        if data > datetime.now(timezone.utc).strftime("%Y-%m-%d"):
-            return f"DATA_ENTRADA no futuro ({data})"
-        return None
-
     def send(self, http, rows) -> SendResult:
         ok, failed = [], []
-        valid = []  # (pk, animal)
+        parsed = []  # (pk, animal) — every animal is sent; no local quality gate
         for row in rows:
             pk = row["pk"]
             try:
-                animal = json.loads(row["payload"])
+                parsed.append((pk, json.loads(row["payload"])))
             except Exception as exc:  # noqa: BLE001
                 failed.append((pk, f"payload inválido: {exc}"))
-                continue
-            err = self._validate(animal)
-            if err:
-                failed.append((pk, f"validação local: {err}"))
-            else:
-                valid.append((pk, animal))
 
-        for chunk in _chunks(valid, self.CHUNK):
+        for chunk in _chunks(parsed, self.CHUNK):
             items = [a for _, a in chunk]
             try:
                 resp = http.request(self.api_method, self.api_path, json={"animais": items})

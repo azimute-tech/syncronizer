@@ -165,14 +165,26 @@ class ControlStore:
             return cur.rowcount
 
     # -- send lifecycle ----------------------------------------------------
-    def select_unsent(self, name: str, limit: int) -> List[dict]:
+    def select_unsent(self, name: str, limit: int, after_pk=None) -> List[dict]:
+        """Rows still needing send (sent=0), ordered by pk. ``after_pk`` is a forward
+        cursor so the SEND phase can drain the whole queue chunk by chunk in one cycle
+        without re-selecting rows that failed earlier in the same pass (a failed row
+        stays sent=0 but its pk is behind the cursor, so it isn't picked up again until
+        the next cycle)."""
         table = schema.table_for(name)
         with self._lock:
-            cur = self.conn.execute(
-                f"SELECT pk, payload, deleted FROM {table} WHERE sent=0 "
-                f"ORDER BY updated_at LIMIT ?",
-                (int(limit),),
-            )
+            if after_pk is None:
+                cur = self.conn.execute(
+                    f"SELECT pk, payload, deleted FROM {table} WHERE sent=0 "
+                    f"ORDER BY pk LIMIT ?",
+                    (int(limit),),
+                )
+            else:
+                cur = self.conn.execute(
+                    f"SELECT pk, payload, deleted FROM {table} WHERE sent=0 AND pk > ? "
+                    f"ORDER BY pk LIMIT ?",
+                    (str(after_pk), int(limit)),
+                )
             return [{"pk": r[0], "payload": r[1], "deleted": bool(r[2])} for r in cur.fetchall()]
 
     def mark_sent(self, name: str, pks: Sequence[str]) -> None:
