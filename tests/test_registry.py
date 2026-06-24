@@ -45,5 +45,5 @@ def test_discovery_skips_underscore_and_broken_and_orders(tmp_path):
 def test_default_package_finds_example():
     endpoints = registry.discover()
     names = [e.name for e in endpoints]
-    assert "produtos" in names
+    assert "animais" in names
     assert "TODO_name" not in names  # _template is never imported
