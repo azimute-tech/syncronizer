@@ -92,7 +92,33 @@ function renderStatus(){
     <label>Firebird configurado</label><div class="${s.firebird_configured?'ok':'err'}">${s.firebird_configured?'sim':'não — configure na aba Configuração'}</div>
     <label>API configurada</label><div class="${s.api_configured?'ok':'warn'}">${s.api_configured?'sim':'não'}</div>
     <label>Total enviados / pendentes</label><div>${s.totals.sent} / ${s.totals.pending}</div>
-  </div></div>`;
+  </div></div>` + renderBackup(s);
+}
+
+function renderBackup(s){
+  const lb = s.last_backup;
+  let last = '(nenhum ainda)';
+  if(lb){
+    if(lb.skipped) last = '<span class="warn">backup em andamento…</span>';
+    else if(lb.ok) last = `<span class="ok">OK</span> — ${lb.data_referencia||''} · ${fmtBytes(lb.size_bytes)} · ${lb.finished_at||''}`;
+    else last = `<span class="err">FALHOU</span> — ${lb.error||''} · ${lb.finished_at||''}`;
+  }
+  return `<div class="card"><h2>Backup do banco</h2><div class="grid">
+    <label>Backup noturno</label><div class="${s.backup_enabled?'ok':'muted'}">${s.backup_enabled?'habilitado':'desabilitado — habilite na aba Configuração'}</div>
+    <label>Último backup</label><div>${last}</div>
+  </div><div class="row" style="margin-top:12px"><button class="btn" onclick="backupNow()">Executar backup agora</button></div></div>`;
+}
+
+function fmtBytes(n){
+  if(n==null) return '-';
+  const u=['B','KB','MB','GB','TB']; let i=0, v=Number(n);
+  while(v>=1024 && i<u.length-1){ v/=1024; i++; }
+  return (i?v.toFixed(1):v) + ' ' + u[i];
+}
+async function backupNow(){
+  if(!confirm('Executar um backup do banco agora? Pode levar alguns minutos.')) return;
+  try{ await api('/api/backup-now',{method:'POST'}); toast('Backup iniciado — acompanhe pelos logs e pelo status.'); }
+  catch(e){ toast('Erro ao iniciar backup: '+e.message); }
 }
 
 function renderConfig(){

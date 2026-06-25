@@ -57,6 +57,15 @@ def run_service(app, log) -> None:
         except Exception as exc:  # noqa: BLE001
             log.exception("update job error: %s", exc)
 
+    def backup_job():
+        # run_backup nunca levanta (captura tudo internamente), mas envolvemos em
+        # try/except por garantia para nunca derrubar o scheduler.
+        try:
+            from .backup import run_backup
+            run_backup(app.settings, app.paths, app.http, log)
+        except Exception as exc:  # noqa: BLE001
+            log.exception("backup job error: %s", exc)
+
     def restart_watch():
         # honor a restart requested by the admin UI (or self-update) promptly
         if app.restart_requested:
@@ -67,6 +76,11 @@ def run_service(app, log) -> None:
     sched.add_job(etl_job, "interval", minutes=s.cycle_minutes, id="etl")
     if s.auto_update:
         sched.add_job(update_job, "interval", minutes=s.update_minutes, id="update")
+    if s.backup_enabled:
+        # cron em UTC (o scheduler é UTC); ~02:00 BRT = 05:00 UTC.
+        sched.add_job(backup_job, "cron", hour=s.backup_hour, minute=s.backup_minute, id="backup")
+        log.info("backup agendado: cron diário %02d:%02d UTC (compression=%s)",
+                 s.backup_hour, s.backup_minute, s.backup_compression)
     if s.run_on_start:
         sched.add_job(etl_job, "date", run_date=now + timedelta(seconds=1), id="startup")
 

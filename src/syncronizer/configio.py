@@ -33,6 +33,14 @@ FIELDS = [
     ("auto_update", "Auto-update via git", "bool", "Atualização", False, False),
     ("update_branch", "Branch do git", "text", "Atualização", False, False),
     ("update_minutes", "Intervalo do auto-update (min)", "int", "Atualização", False, False),
+    ("backup_enabled", "Backup noturno habilitado", "bool", "Backup", False, False),
+    ("backup_hour", "Hora do backup (UTC; 02:00 BRT = 05)", "int", "Backup", False, False),
+    ("backup_minute", "Minuto do backup (UTC)", "int", "Backup", False, False),
+    ("backup_gbak_path", "Caminho do gbak.exe (vazio = auto)", "text", "Backup", True, False),
+    ("backup_db_alias", "Prefixo do arquivo (.fbk)", "text", "Backup", False, False),
+    ("backup_compression", "Compressão (gzip / xz)", "text", "Backup", False, False),
+    ("backup_temp_dir", "Diretório temporário (vazio = padrão)", "text", "Backup", True, False),
+    ("backup_max_retries", "Tentativas de upload", "int", "Backup", False, False),
 ]
 
 _TYPES = {f[0]: f[2] for f in FIELDS}

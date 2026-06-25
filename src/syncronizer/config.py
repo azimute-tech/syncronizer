@@ -28,7 +28,7 @@ except ModuleNotFoundError:  # pragma: no cover - 3.9/3.10 dev box
 
 
 # Sections we flatten as "<section>_<key>" in addition to the bare key.
-_KNOWN_SECTIONS = ("firebird", "api", "runtime", "update", "paths", "logging")
+_KNOWN_SECTIONS = ("firebird", "api", "runtime", "update", "paths", "logging", "backup")
 
 
 def _read_toml(path: Path) -> dict:
@@ -142,6 +142,20 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_max_bytes: int = 10 * 1024 * 1024
     log_backup_count: int = 7
+
+    # --- backup (nightly gbak -> gzip -> signed-URL upload to GCS) ---
+    # reusa [api] (upload-url/confirm) e [firebird] (credenciais do gbak); sem segredos novos.
+    backup_enabled: bool = False
+    backup_hour: int = 5              # hora do cron em UTC (~02:00 BRT = 05:00 UTC)
+    backup_minute: int = 0           # minuto do cron em UTC
+    backup_gbak_path: Optional[Path] = None  # auto-descoberto se vazio
+    backup_gbak_use_service: bool = True     # conecta via "localhost/<port>:<fdb>" (Firebird Service)
+    backup_db_alias: str = "agrodb"  # prefixo do nome do arquivo .fbk gerado
+    backup_compression: str = "gzip"  # "gzip" ou "xz"
+    backup_temp_dir: Optional[Path] = None   # diretório de trabalho do .fbk/.gz; default = state/backup
+    backup_upload_read_timeout: int = 600    # timeout de leitura do PUT (uploads rurais lentos)
+    backup_max_retries: int = 3      # tentativas do triplete upload-url->PUT->confirm
+    backup_min_free_disk_multiplier: float = 2.5  # disco livre >= mult * tamanho do .fdb
 
     @classmethod
     def settings_customise_sources(
