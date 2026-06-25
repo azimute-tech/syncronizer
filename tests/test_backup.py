@@ -189,6 +189,26 @@ def test_produce_backup_gbak_missing_raises_and_no_raw_copy(tmp_path, monkeypatc
 
 
 # --------------------------------------------------------------------------- #
+# caminho vazio (UI salva "") não deve quebrar a auto-descoberta / default
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("empty", ["", ".", None])
+def test_empty_gbak_path_falls_back_to_autodiscovery(tmp_path, monkeypatch, empty):
+    real = tmp_path / "fb" / "gbak.exe"
+    real.parent.mkdir(parents=True)
+    real.write_text("x")
+    monkeypatch.setattr(gcs_backup, "_GBAK_CANDIDATES", (str(real),))
+    s = _settings(tmp_path, backup_gbak_path=empty)
+    assert gcs_backup.resolve_gbak_path(s) == real
+
+
+@pytest.mark.parametrize("empty", ["", ".", None])
+def test_empty_temp_dir_falls_back_to_backup_dir(tmp_path, empty):
+    s = _settings(tmp_path, backup_temp_dir=empty)
+    paths = _paths(tmp_path)
+    assert gcs_backup.resolve_backup_temp(s, paths) == paths.backup_dir
+
+
+# --------------------------------------------------------------------------- #
 # pré-check de disco aborta
 # --------------------------------------------------------------------------- #
 def test_disk_precheck_aborts(tmp_path, monkeypatch):

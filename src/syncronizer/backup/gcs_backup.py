@@ -68,20 +68,34 @@ def _redact_argv(argv) -> str:
     return " ".join(out)
 
 
+def _configured_path(value) -> Path | None:
+    """Normaliza um caminho opcional do config: vazio -> None (cai no default/auto).
+
+    A UI grava o campo vazio como ``""`` no config.toml e o pydantic o converte em
+    ``Path(".")`` (que é "truthy"). Sem isto, um campo deixado em branco seria tratado
+    como "caminho configurado = ." e quebraria a auto-descoberta / o diretório default.
+    """
+    if not value:
+        return None
+    p = Path(value)
+    if str(p) in (".", ""):
+        return None
+    return p
+
+
 def resolve_gbak_path(settings) -> Path:
     """Resolve o caminho do gbak; levanta :class:`BackupError` se ausente.
 
     Usa ``settings.backup_gbak_path`` quando informado; senão tenta os caminhos
     padrão do Firebird 2.5 (Program Files e Program Files (x86)).
     """
-    configured = getattr(settings, "backup_gbak_path", None)
+    configured = _configured_path(getattr(settings, "backup_gbak_path", None))
     if configured:
-        p = Path(configured)
-        if p.is_file():
-            return p
+        if configured.is_file():
+            return configured
         raise BackupError(
-            f"gbak não encontrado no caminho configurado: {p}. "
-            "Ajuste [backup].gbak_path no config.toml."
+            f"gbak não encontrado no caminho configurado: {configured}. "
+            "Ajuste [backup].gbak_path no config.toml (ou deixe vazio para auto-descoberta)."
         )
     for candidate in _GBAK_CANDIDATES:
         p = Path(candidate)
@@ -95,8 +109,8 @@ def resolve_gbak_path(settings) -> Path:
 
 def resolve_backup_temp(settings, paths) -> Path:
     """Resolve o diretório de trabalho do .fbk/.gz (default = ``state/backup``)."""
-    configured = getattr(settings, "backup_temp_dir", None)
-    temp = Path(configured) if configured else paths.backup_dir
+    configured = _configured_path(getattr(settings, "backup_temp_dir", None))
+    temp = configured if configured else paths.backup_dir
     temp.mkdir(parents=True, exist_ok=True)
     return temp
 
