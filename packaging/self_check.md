@@ -18,6 +18,11 @@ What it validates:
    the self-check FAIL — the backup cannot run without them (a missing `gbak` never
    falls back to a raw `.fdb` copy).
 
+Time handling: the ETL execution window (`[runtime].etl_window_*`) and the backup time
+(`[backup].hour/minute`) are in **local time**, derived from a fixed `tz_offset_hours`
+(default `-3` = America/Sao_Paulo) rather than `tzdata` — Brazil has no DST, so the
+scheduler stays in UTC and converts by offset.
+
 Exit codes:
 
 - `0` — endpoints import and the control DB opens. Firebird being unreachable is a

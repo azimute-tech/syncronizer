@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.blocking import BlockingScheduler
 
-from . import bootgate, updater
+from . import bootgate, timewin, updater
 from .web import server as webserver
 
 
@@ -45,6 +45,13 @@ def run_service(app, log) -> None:
             health["marked"] = True
 
     def etl_job():
+        # Janela rígida: fora de [start, end) local não há tráfego à API (nem leitura
+        # do Firebird). O backlog fica durável no control.db e escoa no próximo ciclo
+        # dentro da janela. Vale para o interval E para o startup job (ambos reusam isto).
+        if not timewin.within_window(s):
+            log.info("fora da janela de execução (%02d–%02d local); pulando ciclo",
+                     s.etl_window_start_hour, s.etl_window_end_hour)
+            return
         app.run_cycle()
         maybe_mark_healthy()
         if app.restart_requested:
@@ -66,6 +73,21 @@ def run_service(app, log) -> None:
         except Exception as exc:  # noqa: BLE001
             log.exception("backup job error: %s", exc)
 
+    def backup_catchup_job():
+        # Recupera o backup do dia se as 20:00 falharam (ex.: internet fora). Só dispara
+        # depois do horário agendado e só se o backup de hoje ainda não foi OK; o Lock
+        # module-level + o gating por dia evitam duplicar. Após a meia-noite local vira
+        # outro dia (hora < backup_hour) e para sozinho até o cron do próximo dia.
+        try:
+            from .backup import backup_done_today
+            ln = timewin.local_now(s)
+            after_time = (ln.hour, ln.minute) >= (s.backup_hour, s.backup_minute)
+            if after_time and not backup_done_today(app.paths, s):
+                log.info("backup: catch-up disparado (backup de hoje ainda não concluído)")
+                backup_job()
+        except Exception as exc:  # noqa: BLE001
+            log.exception("backup catch-up error: %s", exc)
+
     def restart_watch():
         # honor a restart requested by the admin UI (or self-update) promptly
         if app.restart_requested:
@@ -77,10 +99,12 @@ def run_service(app, log) -> None:
     if s.auto_update:
         sched.add_job(update_job, "interval", minutes=s.update_minutes, id="update")
     if s.backup_enabled:
-        # cron em UTC (o scheduler é UTC); ~02:00 BRT = 05:00 UTC.
-        sched.add_job(backup_job, "cron", hour=s.backup_hour, minute=s.backup_minute, id="backup")
-        log.info("backup agendado: cron diário %02d:%02d UTC (compression=%s)",
-                 s.backup_hour, s.backup_minute, s.backup_compression)
+        # backup_hour/minute são horário LOCAL; o cron do scheduler é UTC -> converte.
+        bh, bm = timewin.backup_utc_hm(s)
+        sched.add_job(backup_job, "cron", hour=bh, minute=bm, id="backup")
+        sched.add_job(backup_catchup_job, "interval", minutes=30, id="backup_catchup")
+        log.info("backup agendado: %02d:%02d local (=%02d:%02d UTC); catch-up a cada 30min (compression=%s)",
+                 s.backup_hour, s.backup_minute, bh, bm, s.backup_compression)
     if s.run_on_start:
         sched.add_job(etl_job, "date", run_date=now + timedelta(seconds=1), id="startup")
 
@@ -95,8 +119,10 @@ def run_service(app, log) -> None:
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _graceful)
 
-    log.info("scheduler starting: cycle=%dm update=%dm auto_update=%s run_on_start=%s",
-             s.cycle_minutes, s.update_minutes, s.auto_update, s.run_on_start)
+    janela = (f"{s.etl_window_start_hour:02d}–{s.etl_window_end_hour:02d} local"
+              if s.etl_window_enabled else "24h (desabilitada)")
+    log.info("scheduler starting: cycle=%dm update=%dm auto_update=%s run_on_start=%s janela=%s",
+             s.cycle_minutes, s.update_minutes, s.auto_update, s.run_on_start, janela)
     try:
         sched.start()
     except (KeyboardInterrupt, SystemExit):  # pragma: no cover

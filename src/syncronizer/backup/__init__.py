@@ -8,6 +8,6 @@ Fluxo: ``gbak`` (.fbk consistente) -> ``gzip``/``xz`` em streaming (+ sha256 do
 arquivo COMPRIMIDO) -> POST upload-url (farm token) -> PUT direto pro GCS (sem os
 headers de auth/json da sessão compartilhada) -> POST confirm.
 """
-from .gcs_backup import BackupError, run_backup
+from .gcs_backup import BackupError, backup_done_today, run_backup
 
-__all__ = ["run_backup", "BackupError"]
+__all__ = ["run_backup", "BackupError", "backup_done_today"]

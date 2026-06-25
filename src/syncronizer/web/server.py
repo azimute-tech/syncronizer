@@ -12,7 +12,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from .. import __version__, configio
+from .. import __version__, configio, timewin
 from .page import PAGE
 
 log = logging.getLogger("syncronizer.web")
@@ -70,6 +70,12 @@ def build_state(app) -> dict:
         "api_configured": bool(s.api_base_url and (s.api_key or s.api_token)),
         "backup_enabled": bool(getattr(s, "backup_enabled", False)),
         "last_backup": _last_backup(app),
+        "window": {
+            "enabled": bool(getattr(s, "etl_window_enabled", False)),
+            "start": getattr(s, "etl_window_start_hour", None),
+            "end": getattr(s, "etl_window_end_hour", None),
+            "in_window": timewin.within_window(s),
+        },
         "totals": totals,
     }
     return {"status": status, "config": configio.form_model(form_values), "endpoints": endpoints}

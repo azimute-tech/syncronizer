@@ -91,8 +91,18 @@ function renderStatus(){
     <label>Último ciclo</label><div>${s.last_cycle||'(nenhum ainda)'}</div>
     <label>Firebird configurado</label><div class="${s.firebird_configured?'ok':'err'}">${s.firebird_configured?'sim':'não — configure na aba Configuração'}</div>
     <label>API configurada</label><div class="${s.api_configured?'ok':'warn'}">${s.api_configured?'sim':'não'}</div>
+    <label>Janela de execução</label><div>${renderWindow(s)}</div>
     <label>Total enviados / pendentes</label><div>${s.totals.sent} / ${s.totals.pending}</div>
   </div></div>` + renderBackup(s);
+}
+
+function renderWindow(s){
+  const w = s.window;
+  if(!w || !w.enabled) return '<span class="muted">24h (sem janela)</span>';
+  const faixa = `${String(w.start).padStart(2,'0')}–${String(w.end).padStart(2,'0')} local`;
+  if(w.in_window) return `<span class="ok">dentro</span> (${faixa})`;
+  const pend = s.totals.pending ? ` — ${s.totals.pending} pendente(s), enviarão a partir das ${String(w.start).padStart(2,'0')}:00` : '';
+  return `<span class="warn">fora</span> (${faixa})${pend}`;
 }
 
 function renderBackup(s){

@@ -118,6 +118,13 @@ class Settings(BaseSettings):
     misfire_grace_time: int = 300
     run_on_start: bool = True
 
+    # --- janela de execução (sincronização só dentro da janela, horário local) ---
+    # offset fixo em vez de tzdata: Brasil sem horário de verão; utc = local - offset.
+    tz_offset_hours: int = -3        # America/Sao_Paulo
+    etl_window_enabled: bool = True
+    etl_window_start_hour: int = 7   # inclusivo (>=)
+    etl_window_end_hour: int = 19    # exclusivo (<): roda 07:00–18:59, para às 19:00
+
     # --- local admin UI (localhost only) ---
     admin_enabled: bool = True
     admin_host: str = "127.0.0.1"
@@ -146,8 +153,8 @@ class Settings(BaseSettings):
     # --- backup (nightly gbak -> gzip -> signed-URL upload to GCS) ---
     # reusa [api] (upload-url/confirm) e [firebird] (credenciais do gbak); sem segredos novos.
     backup_enabled: bool = False
-    backup_hour: int = 5              # hora do cron em UTC (~02:00 BRT = 05:00 UTC)
-    backup_minute: int = 0           # minuto do cron em UTC
+    backup_hour: int = 20            # horário LOCAL (America/Sao_Paulo); convertido p/ UTC no cron
+    backup_minute: int = 0           # minuto (horário local)
     backup_gbak_path: Optional[Path] = None  # auto-descoberto se vazio
     backup_gbak_use_service: bool = True     # conecta via "localhost/<port>:<fdb>" (Firebird Service)
     backup_db_alias: str = "agrodb"  # prefixo do nome do arquivo .fbk gerado

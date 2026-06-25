@@ -38,6 +38,9 @@ def _settings(tmp_path, **over):
         backup_upload_read_timeout=600,
         backup_max_retries=3,
         backup_min_free_disk_multiplier=2.5,
+        backup_hour=20,
+        backup_minute=0,
+        tz_offset_hours=-3,
     )
     base.update(over)
     s = SimpleNamespace(**base)
@@ -368,6 +371,50 @@ def test_run_backup_retry_exhausted_no_raise(tmp_path, monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
+# data_referencia usa o DIA LOCAL (offset), não UTC
+# --------------------------------------------------------------------------- #
+def test_run_backup_uses_local_date(tmp_path, monkeypatch):
+    _patch_pipeline_ok(tmp_path, monkeypatch, [200])
+    # força o "dia local" para um valor fixo conhecido
+    monkeypatch.setattr(gcs_backup.timewin, "local_today", lambda s, now_utc=None: "2026-06-25")
+    s = _settings(tmp_path)
+    paths = _paths(tmp_path)
+    http = _Http(
+        upload_resp={"upload_url": "https://gcs/signed", "object_path": "b/2026-06-25.fbk.gz"},
+        confirm_resp={"data": {"id": 1}},
+    )
+
+    status = gcs_backup.run_backup(s, paths, http, log)
+
+    assert status["data_referencia"] == "2026-06-25"
+    # a chamada upload-url carrega o data_referencia local
+    upload_meta = next(c[2] for c in http.calls if c[1].endswith("/upload-url"))
+    assert upload_meta["data_referencia"] == "2026-06-25"
+
+
+# --------------------------------------------------------------------------- #
+# backup_done_today: gating do catch-up
+# --------------------------------------------------------------------------- #
+def test_backup_done_today(tmp_path, monkeypatch):
+    s = _settings(tmp_path)
+    paths = _paths(tmp_path)
+    monkeypatch.setattr(gcs_backup.timewin, "local_today", lambda s, now_utc=None: "2026-06-25")
+    status_file = paths.backup_dir / "last_backup.json"
+
+    # sem arquivo -> não feito
+    assert gcs_backup.backup_done_today(paths, s) is False
+    # OK no dia de hoje -> feito
+    status_file.write_text(json.dumps({"ok": True, "data_referencia": "2026-06-25"}))
+    assert gcs_backup.backup_done_today(paths, s) is True
+    # OK mas de ONTEM -> não feito
+    status_file.write_text(json.dumps({"ok": True, "data_referencia": "2026-06-24"}))
+    assert gcs_backup.backup_done_today(paths, s) is False
+    # de hoje mas FALHOU -> não feito
+    status_file.write_text(json.dumps({"ok": False, "data_referencia": "2026-06-25"}))
+    assert gcs_backup.backup_done_today(paths, s) is False
+
+
+# --------------------------------------------------------------------------- #
 # parsing de [backup]
 # --------------------------------------------------------------------------- #
 def test_backup_config_parsing(tmp_path, monkeypatch):
@@ -410,50 +457,71 @@ def test_backup_section_flattens(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------- #
 # gating do scheduler
 # --------------------------------------------------------------------------- #
-def test_scheduler_adds_backup_job_only_when_enabled(monkeypatch):
+class _Sched:
+    def __init__(self, *a, **k):
+        self.jobs = []
+        self.funcs = {}
+
+    def add_job(self, func, trigger, **kw):
+        self.jobs.append(kw.get("id"))
+        self.funcs[kw.get("id")] = func
+
+    def start(self):
+        raise SystemExit  # corta o loop imediatamente
+
+    def shutdown(self, *a, **k):
+        pass
+
+
+def _run_service(monkeypatch, **over):
     import syncronizer.scheduler as scheduler
 
-    class _Sched:
-        def __init__(self, *a, **k):
-            self.jobs = []
-
-        def add_job(self, func, trigger, **kw):
-            self.jobs.append(kw.get("id"))
-
-        def start(self):
-            raise SystemExit  # corta o loop imediatamente
-
-        def shutdown(self, *a, **k):
-            pass
-
     created = {}
-
-    def fake_blocking(*a, **k):
-        sched = _Sched()
-        created["sched"] = sched
-        return sched
-
-    monkeypatch.setattr(scheduler, "BlockingScheduler", fake_blocking)
+    monkeypatch.setattr(scheduler, "BlockingScheduler",
+                        lambda *a, **k: created.setdefault("sched", _Sched()))
     monkeypatch.setattr(scheduler.webserver, "start", lambda *a, **k: None)
     monkeypatch.setattr(scheduler.signal, "signal", lambda *a, **k: None)
 
-    def _run(backup_enabled):
-        s = SimpleNamespace(
-            misfire_grace_time=300, boot_grace_minutes=5, cycle_minutes=10,
-            update_minutes=30, auto_update=False, run_on_start=False,
-            backup_enabled=backup_enabled, backup_hour=5, backup_minute=0,
-            backup_compression="gzip",
-        )
-        app = SimpleNamespace(
-            settings=s, had_successful_cycle=False, restart_requested=False,
-            run_cycle=lambda: None, close=lambda: None,
-            paths=SimpleNamespace(), http=None,
-        )
-        try:
-            scheduler.run_service(app, log)
-        except SystemExit:
-            pass
-        return created["sched"].jobs
+    base = dict(
+        misfire_grace_time=300, boot_grace_minutes=5, cycle_minutes=10,
+        update_minutes=30, auto_update=False, run_on_start=False,
+        backup_enabled=False, backup_hour=20, backup_minute=0, backup_compression="gzip",
+        tz_offset_hours=-3, etl_window_enabled=True,
+        etl_window_start_hour=7, etl_window_end_hour=19,
+    )
+    base.update(over)
+    s = SimpleNamespace(**base)
+    cycles = {"n": 0}
+    app = SimpleNamespace(
+        settings=s, had_successful_cycle=False, restart_requested=False,
+        run_cycle=lambda: cycles.__setitem__("n", cycles["n"] + 1),
+        close=lambda: None, paths=SimpleNamespace(), http=None,
+    )
+    try:
+        scheduler.run_service(app, log)
+    except SystemExit:
+        pass
+    return created["sched"], cycles
 
-    assert "backup" in _run(True)
-    assert "backup" not in _run(False)
+
+def test_scheduler_adds_backup_jobs_only_when_enabled(monkeypatch):
+    on, _ = _run_service(monkeypatch, backup_enabled=True)
+    assert "backup" in on.jobs and "backup_catchup" in on.jobs
+    off, _ = _run_service(monkeypatch, backup_enabled=False)
+    assert "backup" not in off.jobs and "backup_catchup" not in off.jobs
+
+
+def test_scheduler_etl_job_respects_window(monkeypatch):
+    import syncronizer.scheduler as scheduler
+
+    sched, cycles = _run_service(monkeypatch, run_on_start=False)
+    etl = sched.funcs["etl"]
+
+    # fora da janela: não roda o ciclo
+    monkeypatch.setattr(scheduler.timewin, "within_window", lambda s, now_utc=None: False)
+    etl()
+    assert cycles["n"] == 0
+    # dentro da janela: roda
+    monkeypatch.setattr(scheduler.timewin, "within_window", lambda s, now_utc=None: True)
+    etl()
+    assert cycles["n"] == 1

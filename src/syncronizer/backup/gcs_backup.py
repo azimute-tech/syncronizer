@@ -30,6 +30,8 @@ from pathlib import Path
 
 import requests
 
+from .. import timewin
+
 # Chunk do streaming de compressão: 1 MiB mantém a memória constante mesmo para
 # um .fbk de centenas de MB.
 _CHUNK = 1024 * 1024
@@ -99,13 +101,29 @@ def resolve_backup_temp(settings, paths) -> Path:
     return temp
 
 
-def _today() -> str:
-    """Data de referência do backup (YYYY-MM-DD) — UTC, casa com o cron UTC."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def read_status(paths) -> dict | None:
+    """Lê state/backup/last_backup.json (ou None se ausente/ilegível)."""
+    try:
+        with open(paths.backup_dir / "last_backup.json", "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        return None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def backup_done_today(paths, settings) -> bool:
+    """True se já existe um backup OK para o dia útil LOCAL de hoje.
+
+    Base do catch-up: evita repetir o backup quando as 20:00 já tiveram sucesso (o
+    data_referencia é o dia local, igual ao usado por run_backup).
+    """
+    st = read_status(paths)
+    return bool(st and st.get("ok") and st.get("data_referencia") == timewin.local_today(settings))
 
 
 def _sweep_orphans(temp: Path, log) -> None:
@@ -145,7 +163,7 @@ def produce_backup(settings, paths, log) -> Path:
                 f"o .fdb de {fdb_size} bytes)."
             )
 
-    fbk = temp / f"{settings.backup_db_alias}_{_today()}.fbk"
+    fbk = temp / f"{settings.backup_db_alias}_{timewin.local_today(settings)}.fbk"
     # gbak conectando via Firebird Service ("localhost/<port>:<fdb>") — backup
     # consistente da engine, não cópia de arquivo. -g inibe GC, -t transação.
     source = f"localhost/{settings.firebird_port}:{fdb_path}"
@@ -311,7 +329,7 @@ def run_backup(settings, paths, http, log) -> dict:
         log.warning("backup: já há um backup em andamento; ignorando este disparo")
         return {"ok": False, "error": "backup já em andamento", "skipped": True}
 
-    data_ref = _today()
+    data_ref = timewin.local_today(settings)
     started = _now_iso()
     fbk = None
     gz = None
