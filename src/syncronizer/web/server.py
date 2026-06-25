@@ -12,7 +12,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from .. import __version__, configio
+from .. import __version__, configio, timewin
 from .page import PAGE
 
 log = logging.getLogger("syncronizer.web")
@@ -26,6 +26,18 @@ def _log_tail(path, n: int) -> str:
         return "(sem logs ainda)"
     except Exception as exc:  # noqa: BLE001
         return f"(erro lendo log: {exc})"
+
+
+def _last_backup(app) -> dict | None:
+    """Lê o status do último backup de state/backup/last_backup.json (ou None)."""
+    try:
+        path = app.paths.backup_dir / "last_backup.json"
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        return None
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"status ilegível: {exc}"}
 
 
 def build_state(app) -> dict:
@@ -56,6 +68,14 @@ def build_state(app) -> dict:
         "firebird_configured": bool(s.firebird_path),
         "firebird_ok": bool(getattr(app, "last_fb_ok", False)),
         "api_configured": bool(s.api_base_url and (s.api_key or s.api_token)),
+        "backup_enabled": bool(getattr(s, "backup_enabled", False)),
+        "last_backup": _last_backup(app),
+        "window": {
+            "enabled": bool(getattr(s, "etl_window_enabled", False)),
+            "start": getattr(s, "etl_window_start_hour", None),
+            "end": getattr(s, "etl_window_end_hour", None),
+            "in_window": timewin.within_window(s),
+        },
         "totals": totals,
     }
     return {"status": status, "config": configio.form_model(form_values), "endpoints": endpoints}
@@ -120,6 +140,16 @@ def _make_handler(app):
                 if u.path == "/api/restart":
                     app.request_restart()
                     return self._send(200, {"ok": True})
+                if u.path == "/api/backup-now":
+                    # dispara o backup numa daemon thread; o Lock module-level em
+                    # backup.gcs_backup impede sobreposição com o cron/outro disparo.
+                    from ..backup import run_backup
+
+                    def _run():
+                        run_backup(app.settings, app.paths, app.http, log)
+
+                    threading.Thread(target=_run, name="backup-now", daemon=True).start()
+                    return self._send(202, {"ok": True})
                 return self._send(404, {"error": "not found"})
             except Exception as exc:  # noqa: BLE001
                 log.exception("admin API error")

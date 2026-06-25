@@ -12,13 +12,24 @@ What it validates:
    (a rollback) makes this fail.
 3. **Firebird** — if `firebird.path` is configured, attempts a connection and reports
    reachability.
+4. **Backup** — only when `[backup].enabled` is true: validates that `gbak` is present
+   (configured path or auto-discovered), that the temp dir is writable (probe write),
+   and that the API is configured (`base_url` + key/token). Any of these missing makes
+   the self-check FAIL — the backup cannot run without them (a missing `gbak` never
+   falls back to a raw `.fdb` copy).
+
+Time handling: the ETL execution window (`[runtime].etl_window_*`) and the backup time
+(`[backup].hour/minute`) are in **local time**, derived from a fixed `tz_offset_hours`
+(default `-3` = America/Sao_Paulo) rather than `tzdata` — Brazil has no DST, so the
+scheduler stays in UTC and converts by offset.
 
 Exit codes:
 
 - `0` — endpoints import and the control DB opens. Firebird being unreachable is a
   WARNING by default (the service retries every cycle).
-- `1` — endpoints failed to import, the control DB could not be opened/migrated, or
-  (with `--require-firebird`) Firebird was unreachable.
+- `1` — endpoints failed to import, the control DB could not be opened/migrated,
+  (with `--require-firebird`) Firebird was unreachable, or — with `[backup].enabled` —
+  `gbak`/temp dir/API are not ready for the nightly backup.
 
 Usage:
 

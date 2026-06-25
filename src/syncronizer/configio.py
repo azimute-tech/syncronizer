@@ -30,9 +30,21 @@ FIELDS = [
     ("api_token", "Bearer token (opcional)", "password", "API", False, True),
     ("cycle_minutes", "Intervalo do ciclo (min)", "int", "Sincronização", False, False),
     ("batch_size", "Tamanho do lote por ciclo", "int", "Sincronização", False, False),
+    ("etl_window_enabled", "Janela de execução habilitada", "bool", "Sincronização", False, False),
+    ("etl_window_start_hour", "Início da janela (hora local)", "int", "Sincronização", False, False),
+    ("etl_window_end_hour", "Fim da janela (hora local, exclusivo)", "int", "Sincronização", False, False),
+    ("tz_offset_hours", "Offset UTC (-3 = America/Sao_Paulo)", "int", "Sincronização", False, False),
     ("auto_update", "Auto-update via git", "bool", "Atualização", False, False),
     ("update_branch", "Branch do git", "text", "Atualização", False, False),
     ("update_minutes", "Intervalo do auto-update (min)", "int", "Atualização", False, False),
+    ("backup_enabled", "Backup noturno habilitado", "bool", "Backup", False, False),
+    ("backup_hour", "Hora do backup (horário local; ex.: 20)", "int", "Backup", False, False),
+    ("backup_minute", "Minuto do backup (horário local)", "int", "Backup", False, False),
+    ("backup_gbak_path", "Caminho do gbak.exe (vazio = auto)", "text", "Backup", True, False),
+    ("backup_db_alias", "Prefixo do arquivo (.fbk)", "text", "Backup", False, False),
+    ("backup_compression", "Compressão (gzip / xz)", "text", "Backup", False, False),
+    ("backup_temp_dir", "Diretório temporário (vazio = padrão)", "text", "Backup", True, False),
+    ("backup_max_retries", "Tentativas de upload", "int", "Backup", False, False),
 ]
 
 _TYPES = {f[0]: f[2] for f in FIELDS}

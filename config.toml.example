@@ -29,6 +29,14 @@ cycle_minutes = 10
 batch_size = 500
 misfire_grace_time = 300
 run_on_start = true
+# Janela de execução: a sincronização (leitura do Firebird + envio à API) só roda
+# dentro da janela, em HORÁRIO LOCAL. Fora dela o backlog fica durável no control.db
+# e escoa a partir do início da janela. O fuso é por offset fixo (sem tzdata): o Brasil
+# não tem horário de verão, então -3 = America/Sao_Paulo.
+tz_offset_hours = -3
+etl_window_enabled = true
+etl_window_start_hour = 7      # inclusivo (>=)
+etl_window_end_hour = 19       # exclusivo (<): roda 07:00–18:59, para às 19:00
 
 [update]
 auto_update = true
@@ -50,3 +58,23 @@ boot_grace_minutes = 5
 level = "INFO"
 max_bytes = 10485760          # 10 MB
 backup_count = 7
+
+[backup]
+# Backup noturno do Firebird: gbak (.fbk) -> gzip -> upload direto pro GCS via signed URL.
+# Reusa [api] (endpoints upload-url/confirm) e [firebird] (credenciais do gbak); SEM segredos novos.
+enabled = false
+# Horário do backup em HORÁRIO LOCAL (mesmo offset de [runtime].tz_offset_hours).
+# Roda 1x/dia; se a internet cair às 20:00, um catch-up (a cada 30min) retenta no mesmo
+# dia até concluir — no máximo 1 backup OK por dia.
+hour = 20
+minute = 0
+# Caminho do gbak.exe. Vazio = auto-descoberto em C:\Program Files\Firebird\Firebird_2_5\bin
+# (e variante Program Files (x86)).
+# gbak_path = "C:\\Program Files\\Firebird\\Firebird_2_5\\bin\\gbak.exe"
+gbak_use_service = true        # conecta via "localhost/<port>:<fdb>" (usa o Firebird Service)
+db_alias = "agrodb"            # prefixo do nome do arquivo: <db_alias>_<YYYY-MM-DD>.fbk
+compression = "gzip"           # "gzip" (nível 9) ou "xz" (lzma; menor, mais lento)
+# temp_dir = "C:\\ProgramData\\Syncronizer\\state\\backup"   # vazio = state/backup
+upload_read_timeout = 600      # timeout de leitura do PUT em segundos (uploads lentos)
+max_retries = 3                # tentativas do triplete upload-url -> PUT -> confirm
+min_free_disk_multiplier = 2.5 # exige disco livre >= mult * tamanho do .fdb antes do gbak

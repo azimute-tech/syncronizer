@@ -100,6 +100,36 @@ def cmd_self_check(args) -> int:
         if args.require_firebird:
             ok = False
 
+    if settings.backup_enabled:
+        from .backup.gcs_backup import (
+            BackupError,
+            resolve_backup_temp,
+            resolve_gbak_path,
+        )
+        # gbak presente (sem ele o backup é impossível — nunca cai pra cópia crua).
+        try:
+            gbak = resolve_gbak_path(settings)
+            print(f"backup gbak: OK ({gbak})")
+        except BackupError as exc:
+            print(f"backup gbak: FALTANDO ({exc})")
+            ok = False
+        # temp dir gravável (probe write).
+        try:
+            temp = resolve_backup_temp(settings, paths)
+            probe = temp / ".selfcheck-probe"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink()
+            print(f"backup temp: OK ({temp})")
+        except Exception as exc:  # noqa: BLE001
+            print(f"backup temp: NÃO GRAVÁVEL ({exc})")
+            ok = False
+        # API configurada (base_url + key/token) — necessária para upload-url/confirm.
+        if settings.api_base_url and (settings.api_key or settings.api_token):
+            print(f"backup api: OK ({settings.api_base_url})")
+        else:
+            print("backup api: NÃO CONFIGURADA (defina [api].base_url + key/token)")
+            ok = False
+
     print("SELF-CHECK:", "OK" if ok else "FAILED")
     return 0 if ok else 1
 
