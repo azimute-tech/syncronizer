@@ -12,7 +12,8 @@ def _row(**over):
         "CATEGORIA": "BOI INTEIRO", "RACA": "NELORE ",
         "LOTE_ENTRADA": 10001, "LOTE_ATUAL": 10020, "CURRAL_ATUAL": 230,
         "DATA_REGISTRO": date(2026, 1, 28), "DATA_ENTRADA": date(2026, 1, 28),
-        "PESO_ENTRADA": Decimal("315.00"), "RC_ENTRADA": Decimal("50.00"), "IDADE": 15,
+        "PESO_ENTRADA": Decimal("315.00"), "VALOR_ENTRADA": Decimal("0.00"),
+        "RC_ENTRADA": Decimal("50.00"), "IDADE": 15,
         "NUM_CONTRATO": "1",
         "SAIDA": "NENHUM", "DATA_SAIDA": None, "PESO_SAIDA": None,
         "VALOR_SAIDA": Decimal("0.00"),
@@ -27,6 +28,7 @@ def test_transform_shape_and_types():
     assert r["COD_ANIMAL"] == "1"
     assert r["LOTE_ENTRADA"] == "10001" and r["LOTE_ATUAL"] == "10020"
     assert r["PESO_ENTRADA"] == 315.0 and isinstance(r["PESO_ENTRADA"], float)
+    assert r["VALOR_ENTRADA"] is None    # 0,00 do TGC = não informado, nunca custo real
     assert r["RC_ENTRADA"] == 50.0 and r["IDADE"] == 15
     assert r["DATA_ENTRADA"] == "2026-01-28"
     assert r["CATEGORIA"] == "BOI INTEIRO"
@@ -84,6 +86,23 @@ def test_exit_block_only_for_animals_that_left():
     assert sold["PESO_SAIDA"] == 520.0 and sold["VALOR_SAIDA"] == 7300.5
 
 
+def test_valor_entrada_zero_do_tgc_vira_none():
+    """CA_VALORENT fica 0,00 quando a fazenda não informa o custo (backup real de
+    Birigui: 0% das linhas preenchidas). 0 é "não informado", não um animal que custou
+    R$ 0 — encaminhar 0,00 plantaria um custo falso justamente no campo que o AgroDB
+    usa como fallback. Mesmo racional do VALOR_SAIDA 0,00 do rebanho vivo; contraste
+    deliberado com PESO_ENTRADA=0, que É enviado (problema de qualidade)."""
+    ep = AnimaisEndpoint()
+    assert ep.transform(_row(VALOR_ENTRADA=Decimal("0.00")))["VALOR_ENTRADA"] is None
+    assert ep.transform(_row(VALOR_ENTRADA=None))["VALOR_ENTRADA"] is None
+    # quando a fazenda preencher, o valor viaja como float — o driver firebirdsql já
+    # devolve Decimal com a escala aplicada (INTEGER scale -2, centavos)
+    r = ep.transform(_row(VALOR_ENTRADA=Decimal("8532.50")))
+    assert r["VALOR_ENTRADA"] == 8532.5 and isinstance(r["VALOR_ENTRADA"], float)
+    # peso zerado segue o caminho oposto: viaja para o destino apontar o problema
+    assert ep.transform(_row(PESO_ENTRADA=Decimal("0.00")))["PESO_ENTRADA"] == 0.0
+
+
 def test_transform_drops_corrupted_chip():
     """'9,63E+14' is an Excel-destroyed chip (66 rows in the client base) — dropping it
     is not a quality gate, it is refusing to hand 66 animals the same fake identifier."""
@@ -103,6 +122,7 @@ def test_extract_spec_builds_query():
     spec = AnimaisEndpoint().extract_spec(ExtractContext(last_watermark=None))
     assert "CAD_ANIMAL" in spec.sql and spec.params == ()
     assert "CAD_RACA" in spec.sql and "CA_DATAREG" in spec.sql
+    assert "a.CA_VALORENT        AS VALOR_ENTRADA" in spec.sql
     assert spec.incremental is False
 
 

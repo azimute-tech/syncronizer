@@ -27,8 +27,21 @@ Contract v2 (jul/2026) — what changed against the first version:
     NOTE the deliberate contrast with `movimentacoes`: AHT_CURRALORIGEM/DESTINO really
     are names in TGC and stay names (AgroDB has curral_origem_nome/curral_destino_nome
     for exactly that). Do not "unify" the two.
-Renaming a field changes every ``row_hash``, so the first cycle after this ships
-re-sends the whole herd once. That is intended — the destination is rebuilding.
+
+VALOR_ENTRADA (`CA_VALORENT`, ago/2026) — campo estrutural para o fallback de custo do
+animal no AgroDB. Em Birigui ele vem hoje 0/NULL (verificado no backup real: 0% das
+linhas preenchidas), mas o espelho precisa da coluna pronta para quando a fazenda
+passar a preencher — sem ela o dado novo seria descartado em silêncio. O 0,00 é o
+default intocado do TGC para "não informado" (mesmo racional do bloco de saída:
+CA_VALORSAIDA fica 0,00 para todo o rebanho vivo), então 0 vira None no transform em
+vez de virar um custo falso de R$ 0,00 justamente no campo que o AgroDB usaria como
+fallback. Note o contraste deliberado com PESO_ENTRADA: peso 0 É enviado (problema de
+qualidade que o destino deve enxergar e o TGC deve corrigir); valor 0,00 não é dado
+ruim, é ausência de dado.
+
+Renaming a field (PESO_BALANCINHA→PESO_ENTRADA) or adding a column (VALOR_ENTRADA)
+changes every ``row_hash``, so the first cycle after such a change ships re-sends the
+whole herd once. That is intended — the destination is rebuilding.
 
 Data-quality problems (RC_ENTRADA > 100, duplicate SISBOV, ...) are NOT filtered out
 locally — every animal is sent so the destination surfaces the issue. Corrections happen
@@ -58,6 +71,19 @@ def _saida(value):
     if text is None or text.upper() == "NENHUM":
         return None
     return text
+
+
+def _valor_entrada(value):
+    """Custo de entrada, ou None para o 0,00 que o TGC deixa quando não informado.
+
+    Mesmo racional do bloco de saída: 0,00 é o default intocado do TGC, não um custo
+    real de R$ 0. Encaminhá-lo plantaria um custo falso exatamente no campo que o
+    AgroDB usa como fallback (ver docstring do módulo).
+    """
+    valor = num(value)
+    if valor is None or valor == 0:
+        return None
+    return valor
 
 
 class AnimaisEndpoint(BatchEndpoint):
@@ -91,6 +117,7 @@ class AnimaisEndpoint(BatchEndpoint):
             a.CA_DATAREG         AS DATA_REGISTRO,
             a.CA_DATAENT         AS DATA_ENTRADA,
             a.CA_PESO_ENT        AS PESO_ENTRADA,
+            a.CA_VALORENT        AS VALOR_ENTRADA,
             a.CA_RC_ENTRADA      AS RC_ENTRADA,
             a.CA_IDADE           AS IDADE,
             a.CA_NUMCONTRATO     AS NUM_CONTRATO,
@@ -123,6 +150,9 @@ class AnimaisEndpoint(BatchEndpoint):
             "DATA_REGISTRO": iso_date(row.get("DATA_REGISTRO")),
             "DATA_ENTRADA": iso_date(row.get("DATA_ENTRADA")),
             "PESO_ENTRADA": num(row.get("PESO_ENTRADA")),
+            # custo de entrada — 0,00 do TGC significa "não informado" e vira None
+            # (ver _valor_entrada e a nota no docstring do módulo)
+            "VALOR_ENTRADA": _valor_entrada(row.get("VALOR_ENTRADA")),
             "RC_ENTRADA": num(row.get("RC_ENTRADA")),
             "IDADE": integer(row.get("IDADE")),
             "NUM_CONTRATO": opt_str(row.get("NUM_CONTRATO")),
