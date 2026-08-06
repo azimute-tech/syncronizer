@@ -1,84 +1,69 @@
 """TGC `animais` endpoint — sync the herd from Firebird (CAD_ANIMAL) to AgroDB.
 
-Source: Firebird 2.5 `CAD_ANIMAL` (+ CAD_CATEGORIA, CAD_CURRAL).
+Source: Firebird 2.5 `CAD_ANIMAL` (+ CAD_CATEGORIA, CAD_RACA).
 Target: POST /api/integracoes/tgc/animais  body {"animais": [ ... ]} (1..500 itens).
 Auth:   X-API-Key (or Authorization: Bearer) = per-farm TGC token. farm_id comes from
         the token server-side and is NOT sent in the body.
 
-The API upserts and returns 200 {inserted, updated, errors:[{cod_animal, message}]}. So
-send() here POSTs in chunks and reconciles per-item failures by COD_ANIMAL.
+The API upserts and returns 200 {inserted, updated, errors:[{cod_animal, message}]}, so
+the batch send reconciles per-item failures by COD_ANIMAL (see ``_common.BatchEndpoint``).
+
+Runs last of the reference feeds (order=30) so the curral and the lote an animal points
+at have already been sent in the same cycle.
+
+Contract v2 (jul/2026) — what changed against the first version:
+  * DATA_REGISTRO (`CA_DATAREG`) is now sent: it is the immutable, trustworthy creation
+    date. `CA_DATAENT` is user-editable and drifts, so it is no longer the only date.
+  * RACA (via CAD_RACA) and NCF were added.
+  * the exit block (SAIDA, DATA_SAIDA, PESO_SAIDA, VALOR_SAIDA) was added.
+  * PESO_BALANCINHA was renamed PESO_ENTRADA and USUARIO was dropped.
+  * CURRAL_ATUAL now carries the curral CODE (`CA_ULTIMO_CURRAL`), not the name. The
+    destination stores it in `animais_tgc.cod_curral_atual` and joins it against
+    `currais_tgc.cod_curral` (= CC_CODIGO) in `vw_ocupacao_currais`; sending the name
+    made that join miss SILENTLY — the animal simply vanished from the occupancy screen
+    with no error anywhere. The code is also the stable key: a farm renaming a curral
+    would otherwise break the whole history. The name is not denormalized here because
+    the `currais` feed already mirrors CAD_CURRAL, so AgroDB resolves it locally.
+    NOTE the deliberate contrast with `movimentacoes`: AHT_CURRALORIGEM/DESTINO really
+    are names in TGC and stay names (AgroDB has curral_origem_nome/curral_destino_nome
+    for exactly that). Do not "unify" the two.
+Renaming a field changes every ``row_hash``, so the first cycle after this ships
+re-sends the whole herd once. That is intended — the destination is rebuilding.
 
 Data-quality problems (RC_ENTRADA > 100, duplicate SISBOV, ...) are NOT filtered out
 locally — every animal is sent so the destination surfaces the issue. Corrections happen
 in the source (TGC); the next sync detects the changed row (by COD_ANIMAL within the farm)
-and re-sends it with the corrected value.
+and re-sends it with the corrected value. The single exception is the chip literal
+"9,63E+14" (see ``_common.clean_id``): that is not a low-quality identifier, it is a
+destroyed one, and forwarding it would attach the same fake chip to 66 animals.
 """
 from __future__ import annotations
 
-import json
-from datetime import date, datetime
-
-from syncronizer.core.endpoint import Endpoint, SendResult
 from syncronizer.core.extract import ExtractContext, ExtractSpec
-
-
-def _req_str(value):
-    """Required string: stringify + strip; '' if missing."""
-    if value is None:
-        return ""
-    return str(value).strip()
-
-
-def _opt_str(value):
-    """Optional string: trimmed, or None when empty."""
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
+from syncronizer.endpoints._common import (
+    BatchEndpoint,
+    clean_id,
+    integer,
+    iso_date,
+    num,
+    opt_code,
+    opt_str,
+    req_str,
+)
 
 
 def _saida(value):
-    text = _opt_str(value)
+    """Real exit reason, or None for TGC's "still here" marker."""
+    text = opt_str(value)
     if text is None or text.upper() == "NENHUM":
         return None
     return text
 
 
-def _num(value):
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _int(value):
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _iso_date(value):
-    if value is None:
-        return None
-    if isinstance(value, (date, datetime)):
-        return value.strftime("%Y-%m-%d")
-    return str(value)[:10]
-
-
-def _chunks(seq, size):
-    for i in range(0, len(seq), size):
-        yield seq[i:i + size]
-
-
-class AnimaisEndpoint(Endpoint):
+class AnimaisEndpoint(BatchEndpoint):
     name = "animais"                 # -> control table ep_animais
     primary_key = "COD_ANIMAL"       # unique within a farm (one syncronizer = one farm/token)
-    order = 10
+    order = 30
     api_path = "/api/integracoes/tgc/animais"
     api_method = "POST"
 
@@ -87,27 +72,35 @@ class AnimaisEndpoint(Endpoint):
     incremental_column = None
     reconcile_deletes = False        # exits are tracked via SAIDA, not row deletion
 
+    payload_key = "animais"
+    record_key = "COD_ANIMAL"
+    error_key = "cod_animal"
     CHUNK = 200                      # animals per POST (<= API max 500, under rate limits)
 
     _BASE_SQL = """
         SELECT
             a.CA_CODIGO          AS COD_ANIMAL,
-            a.CA_CODLOTE_ENTRADA AS LOTE_ENTRADA,
-            a.CA_CODLOTE         AS LOTE_ATUAL,
-            cur.CC_NOME          AS CURRAL_ATUAL,
-            a.CA_PESO_ENT        AS PESO_BALANCINHA,
-            a.CA_RC_ENTRADA      AS RC_ENTRADA,
-            a.CA_IDADE           AS IDADE,
-            a.CA_DATAENT         AS DATA_ENTRADA,
-            a.CA_USUARIO         AS USUARIO,
-            a.CA_NUMCONTRATO     AS NUM_CONTRATO,
-            cat.CCAT_NOME        AS CATEGORIA,
             a.CA_SISBOV          AS SISBOV,
             a.CA_CHIP            AS CHIP,
-            a.CA_SAIDA           AS SAIDA
+            a.CA_NCF             AS NCF,
+            cat.CCAT_NOME        AS CATEGORIA,
+            rac.CR_NOME          AS RACA,
+            a.CA_CODLOTE_ENTRADA AS LOTE_ENTRADA,
+            a.CA_CODLOTE         AS LOTE_ATUAL,
+            a.CA_ULTIMO_CURRAL   AS CURRAL_ATUAL,
+            a.CA_DATAREG         AS DATA_REGISTRO,
+            a.CA_DATAENT         AS DATA_ENTRADA,
+            a.CA_PESO_ENT        AS PESO_ENTRADA,
+            a.CA_RC_ENTRADA      AS RC_ENTRADA,
+            a.CA_IDADE           AS IDADE,
+            a.CA_NUMCONTRATO     AS NUM_CONTRATO,
+            a.CA_SAIDA           AS SAIDA,
+            a.CA_DATASAIDA       AS DATA_SAIDA,
+            a.CA_PESO_SAIDA      AS PESO_SAIDA,
+            a.CA_VALORSAIDA      AS VALOR_SAIDA
         FROM CAD_ANIMAL a
         LEFT JOIN CAD_CATEGORIA cat ON cat.CCAT_CODIGO = a.CA_CODCATEGORIA
-        LEFT JOIN CAD_CURRAL    cur ON cur.CC_CODIGO   = a.CA_ULTIMO_CURRAL
+        LEFT JOIN CAD_RACA      rac ON rac.CR_CODIGO   = a.CA_CODRACA
         ORDER BY a.CA_CODIGO
     """
 
@@ -115,62 +108,42 @@ class AnimaisEndpoint(Endpoint):
         return ExtractSpec(sql=self._BASE_SQL, params=())
 
     def transform(self, row: dict) -> dict:
-        lote_entrada = _req_str(row.get("LOTE_ENTRADA"))
+        lote_entrada = req_str(row.get("LOTE_ENTRADA"))
         record = {
-            "COD_ANIMAL": _req_str(row.get("COD_ANIMAL")),
+            "COD_ANIMAL": req_str(row.get("COD_ANIMAL")),
+            "CATEGORIA": opt_str(row.get("CATEGORIA")),
+            "RACA": opt_str(row.get("RACA")),
             "LOTE_ENTRADA": lote_entrada,
             # live lote; if the source has no realocação, fall back to the entry lote
-            "LOTE_ATUAL": _req_str(row.get("LOTE_ATUAL")) or lote_entrada,
-            "CURRAL_ATUAL": _opt_str(row.get("CURRAL_ATUAL")),
-            "PESO_BALANCINHA": _num(row.get("PESO_BALANCINHA")),
-            "RC_ENTRADA": _num(row.get("RC_ENTRADA")),
-            "IDADE": _int(row.get("IDADE")),
-            "DATA_ENTRADA": _iso_date(row.get("DATA_ENTRADA")),
-            "USUARIO": _req_str(row.get("USUARIO")),
-            "NUM_CONTRATO": _opt_str(row.get("NUM_CONTRATO")),
-            "CATEGORIA": _opt_str(row.get("CATEGORIA")),
+            "LOTE_ATUAL": req_str(row.get("LOTE_ATUAL")) or lote_entrada,
+            # curral CODE (CC_CODIGO), the key currais_tgc.cod_curral is joined on —
+            # NOT the name (see the contract note in the module docstring)
+            "CURRAL_ATUAL": opt_code(row.get("CURRAL_ATUAL")),
+            # immutable creation date — trust this one over DATA_ENTRADA
+            "DATA_REGISTRO": iso_date(row.get("DATA_REGISTRO")),
+            "DATA_ENTRADA": iso_date(row.get("DATA_ENTRADA")),
+            "PESO_ENTRADA": num(row.get("PESO_ENTRADA")),
+            "RC_ENTRADA": num(row.get("RC_ENTRADA")),
+            "IDADE": integer(row.get("IDADE")),
+            "NUM_CONTRATO": opt_str(row.get("NUM_CONTRATO")),
         }
-        # optional fields: include only when present (mirrors the validated sample)
-        for key, val in (("SISBOV", _opt_str(row.get("SISBOV"))),
-                         ("CHIP", _opt_str(row.get("CHIP"))),
-                         ("SAIDA", _saida(row.get("SAIDA")))):
+
+        # identifiers: sent only when present (mirrors the validated payload)
+        for key, val in (("SISBOV", clean_id(row.get("SISBOV"))),
+                         ("CHIP", clean_id(row.get("CHIP"))),
+                         ("NCF", opt_str(row.get("NCF")))):
             if val is not None:
                 record[key] = val
+
+        # exit block: only for an animal that actually left. TGC leaves CA_VALORSAIDA at
+        # 0,00 for the whole live herd, so sending it unconditionally would ship a fake
+        # "exit worth zero" for every animal still on the farm.
+        saida = _saida(row.get("SAIDA"))
+        if saida is not None:
+            record["SAIDA"] = saida
+            for key, val in (("DATA_SAIDA", iso_date(row.get("DATA_SAIDA"))),
+                             ("PESO_SAIDA", num(row.get("PESO_SAIDA"))),
+                             ("VALOR_SAIDA", num(row.get("VALOR_SAIDA")))):
+                if val is not None:
+                    record[key] = val
         return record
-
-    def send(self, http, rows) -> SendResult:
-        ok, failed = [], []
-        parsed = []  # (pk, animal) — every animal is sent; no local quality gate
-        for row in rows:
-            pk = row["pk"]
-            try:
-                parsed.append((pk, json.loads(row["payload"])))
-            except Exception as exc:  # noqa: BLE001
-                failed.append((pk, f"payload inválido: {exc}"))
-
-        for chunk in _chunks(parsed, self.CHUNK):
-            items = [a for _, a in chunk]
-            try:
-                resp = http.request(self.api_method, self.api_path, json={"animais": items})
-                data = resp.json() if resp.content else {}
-                err_by_cod = {e.get("cod_animal"): e.get("message")
-                              for e in (data.get("errors") or [])}
-                for pk, animal in chunk:
-                    cod = animal.get("COD_ANIMAL")
-                    if cod in err_by_cod:
-                        failed.append((pk, f"api: {err_by_cod[cod]}"))
-                    else:
-                        ok.append(pk)
-            except Exception as exc:  # noqa: BLE001 - whole chunk retries next cycle
-                # capture the API response body so the reason is actionable
-                # (status + e.g. which field/animal the API rejected, 401, 429, ...)
-                detail = str(exc)
-                resp = getattr(exc, "response", None)
-                if resp is not None:
-                    try:
-                        detail = f"{resp.status_code}: {resp.text[:300]}"
-                    except Exception:  # noqa: BLE001
-                        pass
-                for pk, _ in chunk:
-                    failed.append((pk, f"http: {detail}"))
-        return SendResult(ok, failed)
