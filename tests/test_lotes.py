@@ -1,6 +1,7 @@
 import json
 import re
 from datetime import date
+from decimal import Decimal
 
 from syncronizer.core.extract import ExtractContext
 from syncronizer.endpoints.lotes import LotesEndpoint
@@ -12,6 +13,7 @@ def _row(**over):
         "STATUS": "A", "QTD_CABECAS": 301, "DIAS_CONFINAMENTO_ALVO": 100,
         "DATA_MEDIA_ENTRADA": date(2026, 3, 10), "DATA_FIM": date(2026, 6, 29),
         "NUM_CONTRATO": None,
+        "COD_CURVA": 58, "DESTINO": "MÉDIO 520", "CUSTO_FIXO_DIA": Decimal("2.5000"),
     }
     base.update(over)
     return base
@@ -27,6 +29,24 @@ def test_transform_shape_and_types():
     assert r["QTD_CABECAS"] == 301 and r["DIAS_CONFINAMENTO_ALVO"] == 100
     assert r["DATA_MEDIA_ENTRADA"] == "2026-03-10" and r["DATA_FIM"] == "2026-06-29"
     assert r["NUM_CONTRATO"] is None
+    assert r["COD_CURVA"] == "58"
+    assert r["DESTINO"] == "MÉDIO 520"
+    assert r["CUSTO_FIXO_DIA"] == 2.5 and isinstance(r["CUSTO_FIXO_DIA"], float)
+
+
+def test_bloco_de_curva_do_contrato_v3():
+    """COD_CURVA 0 é o sentinelo "sem curva" do TGC (25 lotes na base real) e vira
+    None; DESTINO é o NOME da meta (AUX_DESTINOANIMAL.ADA_NOME); CUSTO_FIXO_DIA
+    segue cru — 0,50 na base real é diária válida, não "não informado"."""
+    ep = LotesEndpoint()
+    r = ep.transform(_row(COD_CURVA=0, DESTINO=None, CUSTO_FIXO_DIA=Decimal("0.5000")))
+    assert r["COD_CURVA"] is None
+    assert r["DESTINO"] is None
+    assert r["CUSTO_FIXO_DIA"] == 0.5
+    spec = ep.extract_spec(ExtractContext(last_watermark=None))
+    assert "CLL_COD_CURVA" in spec.sql
+    assert "CLL_DESTINO" in spec.sql
+    assert "CLL_CUSTOFIXO" in spec.sql
 
 
 def test_phase_comes_from_tipo_exploracao_not_tipo():

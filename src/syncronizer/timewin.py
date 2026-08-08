@@ -33,13 +33,17 @@ def within_window(settings, now_utc: datetime | None = None) -> bool:
     return h >= start or h < end
 
 
-def backup_utc_hm(settings) -> tuple[int, int]:
-    """Converte o horário LOCAL do backup para (hora, minuto) UTC do cron.
+def local_hm_to_utc(settings, hour: int, minute: int) -> tuple[int, int]:
+    """Converte um horário LOCAL (hora, minuto) para o (hora, minuto) UTC do cron.
 
     20:00 local com offset -3 -> 23:00 UTC. O ``% 24`` cobre o wrap (ex.: offset -4).
     """
-    utc_hour = (settings.backup_hour - settings.tz_offset_hours) % 24
-    return utc_hour, settings.backup_minute
+    return (hour - settings.tz_offset_hours) % 24, minute
+
+
+def backup_utc_hm(settings) -> tuple[int, int]:
+    """Horário LOCAL do backup convertido para (hora, minuto) UTC do cron."""
+    return local_hm_to_utc(settings, settings.backup_hour, settings.backup_minute)
 
 
 def local_today(settings, now_utc: datetime | None = None) -> str:

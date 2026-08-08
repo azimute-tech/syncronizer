@@ -78,3 +78,16 @@ compression = "gzip"           # "gzip" (nível 9) ou "xz" (lzma; menor, mais le
 upload_read_timeout = 600      # timeout de leitura do PUT em segundos (uploads lentos)
 max_retries = 3                # tentativas do triplete upload-url -> PUT -> confirm
 min_free_disk_multiplier = 2.5 # exige disco livre >= mult * tamanho do .fdb antes do gbak
+
+[indicadores]
+# Raspagem noturna do Indicador do Boi Gordo CEPEA/B3 (CEPEA-ESALQ/USP, à vista, base SP,
+# R$/@) e envio à API do AgroDB (preço default da simulação de venda). Reusa [api]
+# (POST /api/integracoes/indicadores com o mesmo auth); SEM segredos novos.
+# TODAS as fazendas enviam o mesmo indicador do dia — a API faz upsert por
+# (indicador, data), então re-envio é sucesso normal (idempotente de ponta a ponta).
+enabled = false
+# Horário em HORÁRIO LOCAL (mesmo offset de [runtime].tz_offset_hours). Roda 1x/dia;
+# se falhar (internet fora), um catch-up (a cada 30min) retenta no mesmo dia até
+# concluir — no máximo 1 sucesso/dia por instância.
+hour = 20
+minute = 30

@@ -28,7 +28,8 @@ except ModuleNotFoundError:  # pragma: no cover - 3.9/3.10 dev box
 
 
 # Sections we flatten as "<section>_<key>" in addition to the bare key.
-_KNOWN_SECTIONS = ("firebird", "api", "runtime", "update", "paths", "logging", "backup")
+_KNOWN_SECTIONS = ("firebird", "api", "runtime", "update", "paths", "logging", "backup",
+                   "indicadores")
 
 
 def _read_toml(path: Path) -> dict:
@@ -163,6 +164,12 @@ class Settings(BaseSettings):
     backup_upload_read_timeout: int = 600    # timeout de leitura do PUT (uploads rurais lentos)
     backup_max_retries: int = 3      # tentativas do triplete upload-url->PUT->confirm
     backup_min_free_disk_multiplier: float = 2.5  # disco livre >= mult * tamanho do .fdb
+
+    # --- indicadores (raspagem noturna do CEPEA boi gordo -> API do AgroDB) ---
+    # reusa [api] (POST /api/integracoes/indicadores com o mesmo auth); sem segredos novos.
+    indicadores_enabled: bool = False
+    indicadores_hour: int = 20       # horário LOCAL (America/Sao_Paulo); convertido p/ UTC no cron
+    indicadores_minute: int = 30     # minuto (horário local)
 
     @classmethod
     def settings_customise_sources(
