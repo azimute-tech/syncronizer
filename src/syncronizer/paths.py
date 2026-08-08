@@ -46,6 +46,7 @@ class Paths:
     state_dir: Path
     control_db: Path
     backup_dir: Path
+    indicadores_dir: Path
     logs_dir: Path
     log_file: Path
     # self-update state markers
@@ -60,7 +61,8 @@ class Paths:
     nssm_exe: Path | None
 
     def ensure_dirs(self) -> None:
-        for d in (self.config_dir, self.state_dir, self.backup_dir, self.logs_dir):
+        for d in (self.config_dir, self.state_dir, self.backup_dir,
+                  self.indicadores_dir, self.logs_dir):
             d.mkdir(parents=True, exist_ok=True)
 
 
@@ -99,6 +101,7 @@ def build_paths(settings, data_dir: Path | None = None) -> Paths:
         state_dir=state_dir,
         control_db=state_dir / "control.db",
         backup_dir=state_dir / "backup",
+        indicadores_dir=state_dir / "indicadores",
         logs_dir=logs_dir,
         log_file=logs_dir / "syncronizer.log",
         last_applied_commit=state_dir / "last_applied_commit",

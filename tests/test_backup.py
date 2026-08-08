@@ -486,6 +486,7 @@ def _run_service(monkeypatch, **over):
         misfire_grace_time=300, boot_grace_minutes=5, cycle_minutes=10,
         update_minutes=30, auto_update=False, run_on_start=False,
         backup_enabled=False, backup_hour=20, backup_minute=0, backup_compression="gzip",
+        indicadores_enabled=False, indicadores_hour=20, indicadores_minute=30,
         tz_offset_hours=-3, etl_window_enabled=True,
         etl_window_start_hour=7, etl_window_end_hour=19,
     )

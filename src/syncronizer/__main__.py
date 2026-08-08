@@ -2,8 +2,9 @@
 service (`<venv>\\python.exe -m syncronizer run`).
 
 Subcommands:
-  run           start the always-on scheduler (ETL + self-update jobs)
-  run-once      execute a single ETL+SEND cycle and exit (first-install validation)
+  run              start the always-on scheduler (ETL + self-update jobs)
+  run-once         execute a single ETL+SEND cycle and exit (first-install validation)
+  indicadores-once scrape the CEPEA boi gordo indicator and POST it to the API once
   self-check    import endpoints, open the control DB (+ optionally Firebird)
   print-config  print resolved settings + paths as JSON (secrets redacted)
   install-help  print the NSSM service registration commands
@@ -149,6 +150,30 @@ def cmd_run_once(_args) -> int:
     return 0
 
 
+def cmd_indicadores_once(_args) -> int:
+    # Ciclo avulso do indicador CEPEA boi gordo (validação de staging/primeira
+    # instalação). Não abre control.db nem Firebird — só HTTP (widget + API).
+    # Exit code 1 em falha para o chamador (script de staging) detectar.
+    from .config import load_settings
+    from .http.client import HttpClient
+    from .indicadores import run_indicadores
+    from .paths import build_paths
+    settings = load_settings()
+    paths = build_paths(settings)
+    log = _setup(settings, paths)
+    http = HttpClient(
+        settings.api_base_url, settings.api_token,
+        settings.api_timeout, settings.api_max_retries,
+        api_key=settings.api_key, api_key_header=settings.api_key_header,
+    )
+    try:
+        status = run_indicadores(settings, paths, http, log)
+    finally:
+        http.close()
+    print(json.dumps(status, ensure_ascii=False, indent=2))
+    return 0 if status.get("ok") else 1
+
+
 def cmd_run(_args) -> int:
     # Crash-loop breaker runs FIRST, with only stdlib + paths/bootgate/updater deps, so
     # a regression in config/app code (or logging) from a bad self-update still counts
@@ -216,6 +241,10 @@ def main(argv=None) -> int:
 
     sub.add_parser("run", help="start the always-on scheduler").set_defaults(func=cmd_run)
     sub.add_parser("run-once", help="run a single cycle and exit").set_defaults(func=cmd_run_once)
+    sub.add_parser(
+        "indicadores-once",
+        help="raspa o indicador CEPEA boi gordo e envia à API (um ciclo)",
+    ).set_defaults(func=cmd_indicadores_once)
 
     sc = sub.add_parser("self-check", help="validate endpoints + DBs")
     sc.add_argument("--require-firebird", action="store_true",
