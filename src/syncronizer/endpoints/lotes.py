@@ -17,6 +17,22 @@ confinamento; reading it as the phase would classify the whole herd wrong.
 `CLL_STATUS` is forwarded raw as TGC stores it — CHAR(1), 'A' (ativo) / 'I' (inativo).
 It is deliberately NOT expanded to ATIVO/INATIVO here: inventing labels in the agent
 would hide what the source actually holds.
+
+Contrato v3 (ago/2026) — bloco de consumo/curvas:
+  * COD_CURVA (`CLL_COD_CURVA`) — a curva de crescimento (DET_CATEGORIA) que o feed
+    `curvas` espelha. 25 lotes na base real carregam 0 (= sem curva atribuída), o
+    sentinelo padrão do TGC, então 0 vira None via ``opt_code`` como toda FK daqui.
+  * DESTINO (`CLL_DESTINO`) — o nome da meta de abate (AUX_DESTINOANIMAL, feed
+    `metas_abate`), ex. "MÉDIO 520". É NOME, não código: a PK real da tabela de
+    metas é ADA_NOME.
+  * CUSTO_FIXO_DIA (`CLL_CUSTOFIXO`) — diária fixa R$/cab/dia. BIGINT scale -4 no
+    Firebird; o driver devolve Decimal já com a escala aplicada (2.5000 → 2.5).
+    Base real: 130 lotes a 2,50 e 2 a 0,50 — sem zeros, valor baixo é valor real,
+    então segue cru via ``num`` (sem regra 0→None).
+
+Adicionar coluna muda o ``row_hash`` de TODOS os lotes: o primeiro ciclo depois
+deste deploy re-envia o espelho de lotes inteiro uma única vez. É intencional —
+o destino está sendo reconstruído com as colunas novas.
 """
 from __future__ import annotations
 
@@ -25,6 +41,7 @@ from syncronizer.endpoints._common import (
     BatchEndpoint,
     integer,
     iso_date,
+    num,
     opt_code,
     opt_str,
     req_str,
@@ -58,7 +75,10 @@ class LotesEndpoint(BatchEndpoint):
             l.CLL_DIASCONFINAM    AS DIAS_CONFINAMENTO_ALVO,
             l.CLL_DATA_MEDIA_ENT  AS DATA_MEDIA_ENTRADA,
             l.CLL_DATAFIM         AS DATA_FIM,
-            l.CLL_NUMCONTRATO     AS NUM_CONTRATO
+            l.CLL_NUMCONTRATO     AS NUM_CONTRATO,
+            l.CLL_COD_CURVA       AS COD_CURVA,
+            l.CLL_DESTINO         AS DESTINO,
+            l.CLL_CUSTOFIXO       AS CUSTO_FIXO_DIA
         FROM CAD_LOTE l
         ORDER BY l.CLL_CODNOME
     """
@@ -79,4 +99,10 @@ class LotesEndpoint(BatchEndpoint):
             "DATA_MEDIA_ENTRADA": iso_date(row.get("DATA_MEDIA_ENTRADA")),
             "DATA_FIM": iso_date(row.get("DATA_FIM")),
             "NUM_CONTRATO": opt_str(row.get("NUM_CONTRATO")),
+            # curva de crescimento — 0 é o sentinelo "sem curva" do TGC (25 lotes na base)
+            "COD_CURVA": opt_code(row.get("COD_CURVA")),
+            # NOME da meta de abate (AUX_DESTINOANIMAL.ADA_NOME), ex. "MÉDIO 520"
+            "DESTINO": opt_str(row.get("DESTINO")),
+            # diária fixa R$/cab/dia, escala já aplicada pelo driver; 0,50 é valor real
+            "CUSTO_FIXO_DIA": num(row.get("CUSTO_FIXO_DIA")),
         }
