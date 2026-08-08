@@ -15,7 +15,7 @@ def _row(**over):
         "PESO_ENTRADA": Decimal("315.00"), "VALOR_ENTRADA": Decimal("0.00"),
         "RC_ENTRADA": Decimal("50.00"), "IDADE": 15,
         "NUM_CONTRATO": "1",
-        "SAIDA": "NENHUM", "DATA_SAIDA": None, "PESO_SAIDA": None,
+        "SAIDA": "NENHUM", "CAUSA_MORTE": None, "DATA_SAIDA": None, "PESO_SAIDA": None,
         "VALOR_SAIDA": Decimal("0.00"),
     }
     base.update(over)
@@ -36,6 +36,7 @@ def test_transform_shape_and_types():
     assert r["RACA"] == "NELORE"         # VARCHAR padding stripped
     # NENHUM/None optional fields omitted (mirrors validated payload)
     assert "SAIDA" not in r and "SISBOV" not in r and "CHIP" not in r and "NCF" not in r
+    assert "CAUSA_MORTE" not in r
     assert ep.make_pk(r) == "1"
 
 
@@ -103,6 +104,30 @@ def test_valor_entrada_zero_do_tgc_vira_none():
     assert ep.transform(_row(PESO_ENTRADA=Decimal("0.00")))["PESO_ENTRADA"] == 0.0
 
 
+def test_causa_morte_viaja_com_a_morte():
+    """Morte é a única saída tratada no escopo atual e precisa vir COM a causa
+    (CA_CAUSAMORTE — 39 mortes com 16 causas distintas na base real). Padding de
+    CHAR/VARCHAR é removido como nos demais campos."""
+    ep = AnimaisEndpoint()
+    r = ep.transform(_row(SAIDA="MORTE", DATA_SAIDA=date(2026, 4, 8),
+                          CAUSA_MORTE="PNEUMONIA "))
+    assert r["SAIDA"] == "MORTE"
+    assert r["CAUSA_MORTE"] == "PNEUMONIA"
+    # morte sem causa registrada: o campo é omitido, nunca "" (padrão do módulo)
+    sem_causa = ep.transform(_row(SAIDA="MORTE", CAUSA_MORTE=None))
+    assert sem_causa["SAIDA"] == "MORTE" and "CAUSA_MORTE" not in sem_causa
+    assert "CAUSA_MORTE" not in ep.transform(_row(SAIDA="MORTE", CAUSA_MORTE="  "))
+
+
+def test_causa_morte_preenchida_viaja_mesmo_fora_do_bloco_de_saida():
+    """O envio NÃO é condicionado a SAIDA=MORTE: dado preenchido viaja (na base real
+    só existe em MORTE, mas um preenchimento fora do padrão no TGC não pode ser
+    descartado em silêncio pelo espelho)."""
+    ep = AnimaisEndpoint()
+    vivo = ep.transform(_row(CAUSA_MORTE="PNEUMONIA"))       # SAIDA=NENHUM
+    assert "SAIDA" not in vivo and vivo["CAUSA_MORTE"] == "PNEUMONIA"
+
+
 def test_transform_drops_corrupted_chip():
     """'9,63E+14' is an Excel-destroyed chip (66 rows in the client base) — dropping it
     is not a quality gate, it is refusing to hand 66 animals the same fake identifier."""
@@ -123,6 +148,7 @@ def test_extract_spec_builds_query():
     assert "CAD_ANIMAL" in spec.sql and spec.params == ()
     assert "CAD_RACA" in spec.sql and "CA_DATAREG" in spec.sql
     assert "a.CA_VALORENT        AS VALOR_ENTRADA" in spec.sql
+    assert "a.CA_CAUSAMORTE      AS CAUSA_MORTE" in spec.sql
     assert spec.incremental is False
 
 

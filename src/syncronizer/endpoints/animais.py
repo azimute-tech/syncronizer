@@ -39,9 +39,19 @@ fallback. Note o contraste deliberado com PESO_ENTRADA: peso 0 É enviado (probl
 qualidade que o destino deve enxergar e o TGC deve corrigir); valor 0,00 não é dado
 ruim, é ausência de dado.
 
-Renaming a field (PESO_BALANCINHA→PESO_ENTRADA) or adding a column (VALOR_ENTRADA)
-changes every ``row_hash``, so the first cycle after such a change ships re-sends the
-whole herd once. That is intended — the destination is rebuilding.
+CAUSA_MORTE (`CA_CAUSAMORTE`, ago/2026, contrato v3) — morte é a única saída tratada
+no escopo atual e precisa viajar COM a causa. Na base real ela só aparece preenchida
+em animais com CA_SAIDA='MORTE' (39 animais, 16 causas distintas — de PNEUMONIA a
+RAIO, incluindo lixo como "167-27", que viaja mesmo assim: sem quality gate local),
+mas o envio NÃO é condicionado ao bloco de saída — dado preenchido viaja, seja qual
+for a saída, para o espelho nunca descartar causa em silêncio se o TGC preencher
+fora do padrão.
+
+Renaming a field (PESO_BALANCINHA→PESO_ENTRADA) or adding a column (VALOR_ENTRADA,
+CAUSA_MORTE) changes every ``row_hash``, so the first cycle after such a change
+re-sends the whole herd once. That is intended — the destination is rebuilding.
+VALOR_ENTRADA e CAUSA_MORTE entram JUNTOS nesta release: o re-envio único do rebanho
+já previsto pelo VALOR_ENTRADA absorve a CAUSA_MORTE sem um segundo re-envio.
 
 Data-quality problems (RC_ENTRADA > 100, duplicate SISBOV, ...) are NOT filtered out
 locally — every animal is sent so the destination surfaces the issue. Corrections happen
@@ -122,6 +132,7 @@ class AnimaisEndpoint(BatchEndpoint):
             a.CA_IDADE           AS IDADE,
             a.CA_NUMCONTRATO     AS NUM_CONTRATO,
             a.CA_SAIDA           AS SAIDA,
+            a.CA_CAUSAMORTE      AS CAUSA_MORTE,
             a.CA_DATASAIDA       AS DATA_SAIDA,
             a.CA_PESO_SAIDA      AS PESO_SAIDA,
             a.CA_VALORSAIDA      AS VALOR_SAIDA
@@ -164,6 +175,12 @@ class AnimaisEndpoint(BatchEndpoint):
                          ("NCF", opt_str(row.get("NCF")))):
             if val is not None:
                 record[key] = val
+
+        # causa da morte: enviada sempre que preenchida, fora do gate do bloco de
+        # saída de propósito (ver docstring) — na base real só existe em SAIDA=MORTE
+        causa_morte = opt_str(row.get("CAUSA_MORTE"))
+        if causa_morte is not None:
+            record["CAUSA_MORTE"] = causa_morte
 
         # exit block: only for an animal that actually left. TGC leaves CA_VALORSAIDA at
         # 0,00 for the whole live herd, so sending it unconditionally would ship a fake
