@@ -9,7 +9,7 @@ from syncronizer.endpoints.fornecimentos import FornecimentosEndpoint
 def _row(**over):
     base = {
         "COD_FORNECIMENTO": 41021, "DATA": date(2026, 8, 5),
-        "COD_LOTE": 10132, "COD_CURRAL": 252, "TRATO": 4,
+        "COD_LOTE": 10132, "COD_CURRAL": 252, "COD_RACAO_PROD": 10023, "TRATO": 4,
         "PREVISTO_KG": Decimal("252.0691"), "REALIZADO_KG": Decimal("290.0000"),
         "SOBRA_KG": Decimal("0.0000"), "QTD_CABECAS": 108,
         "MS_PCT": Decimal("56.8620"), "CUSTO_KG_MN": Decimal("0.5679"),
@@ -69,6 +69,21 @@ def test_extract_spec_filtra_d1_full_scan():
 def test_curral_zero_sentinela_vira_none():
     r = FornecimentosEndpoint().transform(_row(COD_CURRAL=0))
     assert r["COD_CURRAL"] is None
+
+
+def test_cod_racao_prod_e_a_dieta_fornecida_nao_a_prevista():
+    """CFORN_CODRACAOPROD dá o corte por dieta no relatório de Tratos (join com
+    racoes_tgc.cod_racao_prod). NÃO confundir com CFORN_CODRACAOPROD_PREV (a dieta
+    PREVISTA pelo plano) nem com CFORN_CODRACAOPROD_FORN, que existem na mesma tabela:
+    o relatório quer a dieta efetivamente fornecida."""
+    ep = FornecimentosEndpoint()
+    assert ep.transform(_row())["COD_RACAO_PROD"] == "10023"
+    # sentinela 0 do TGC não vira referência pendurada no destino
+    assert ep.transform(_row(COD_RACAO_PROD=0))["COD_RACAO_PROD"] is None
+    spec = ep.extract_spec(ExtractContext(last_watermark=None))
+    assert "CFORN_CODRACAOPROD " in spec.sql        # a coluna, com o espaço do alias
+    assert "CFORN_CODRACAOPROD_PREV" not in spec.sql
+    assert "CFORN_CODRACAOPROD_FORN" not in spec.sql
 
 
 class _Resp:

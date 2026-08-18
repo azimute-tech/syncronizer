@@ -33,6 +33,20 @@ falso de R$ 0/kg (mesmo racional do VALOR_ENTRADA em `animais`).
 Escalas: PREVISTO/REALIZADO/SOBRACOCHO/MSRACAO/CUSTO são BIGINT scale -4; o driver
 firebirdsql devolve Decimal já com a escala aplicada (252.0691 kg, 56.8620 %MS,
 0.5679 R$/kg — conferido na base real).
+
+COD_RACAO_PROD (`CFORN_CODRACAOPROD`, ago/2026) — a dieta que o trato entregou, para o
+corte por dieta no relatório de Tratos. Aponta para `racoes_tgc.cod_racao_prod`
+(CRP_CODIGO, feed `racoes` order=20, que já roda antes deste). Na base real está
+preenchida em 13.082/13.082 linhas, nunca 0 e nunca NULL, com zero órfãos contra
+CAD_RACAO_PROD — ainda assim passa por ``opt_code`` para que o 0 sentinela do TGC, se
+aparecer, não vire referência pendurada no destino. NÃO confundir com
+`CFORN_CODRACAOPROD_PREV` (a dieta PREVISTA pelo plano) nem com
+`CFORN_CODRACAOPROD_FORN`, que existem na mesma tabela: o relatório quer a dieta
+efetivamente fornecida.
+
+Acrescentar uma coluna muda todo ``row_hash``, então o primeiro ciclo depois desta
+release re-envia os tratos uma vez. É intencional — o destino está preenchendo a
+coluna nova.
 """
 from __future__ import annotations
 
@@ -76,6 +90,7 @@ class FornecimentosEndpoint(BatchEndpoint):
             f.CFORN_DATAFORNECIDO  AS DATA,
             f.CFORN_CODLOTE        AS COD_LOTE,
             f.CFORN_CODBAIA        AS COD_CURRAL,
+            f.CFORN_CODRACAOPROD   AS COD_RACAO_PROD,
             f.CFORN_TRATO          AS TRATO,
             f.CFORN_PREVISTO       AS PREVISTO_KG,
             f.CFORN_REALIZADO      AS REALIZADO_KG,
@@ -99,6 +114,9 @@ class FornecimentosEndpoint(BatchEndpoint):
             "COD_LOTE": req_str(row.get("COD_LOTE")),
             # CFORN_CODBAIA é o CÓDIGO do curral (CC_CODIGO) — join limpo conferido na base
             "COD_CURRAL": opt_code(row.get("COD_CURRAL")),
+            # dieta EFETIVAMENTE fornecida (CRP_CODIGO) — join com racoes_tgc;
+            # não é a prevista (CFORN_CODRACAOPROD_PREV), ver docstring
+            "COD_RACAO_PROD": opt_code(row.get("COD_RACAO_PROD")),
             "TRATO": integer(row.get("TRATO")),
             # kg 0 é dado real (trato previsto e não fornecido) — viaja como 0.0
             "PREVISTO_KG": num(row.get("PREVISTO_KG")),

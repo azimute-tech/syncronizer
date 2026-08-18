@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from syncronizer.core.endpoint import Endpoint, SendResult
 
@@ -86,6 +86,25 @@ def iso_date(value):
     if isinstance(value, (date, datetime)):
         return value.strftime("%Y-%m-%d")
     return str(value)[:10]
+
+
+def hhmm(value):
+    """Firebird TIME -> texto ``HH:MM``; None quando ausente.
+
+    O driver firebirdsql devolve uma coluna TIME como ``datetime.time`` (com
+    microssegundos), e o contrato pede a hora como texto ``HH:MM`` — segundos e frações
+    não têm significado nenhum num horário de batida digitado à mão. O fallback para
+    ``str(value)[:5]`` cobre o caso de um driver devolver a hora já como texto.
+
+    NÃO existe regra de zero aqui: ``00:00`` é encaminhado como qualquer outra hora
+    (ver a nota de `batidas`, onde 100% das linhas da staging estão nesse default).
+    """
+    if value is None:
+        return None
+    if isinstance(value, (time, datetime)):
+        return value.strftime("%H:%M")
+    text = str(value).strip()[:5]
+    return text or None
 
 
 def flag_sn(value):
