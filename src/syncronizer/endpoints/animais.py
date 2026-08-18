@@ -47,11 +47,35 @@ mas o envio NÃO é condicionado ao bloco de saída — dado preenchido viaja, s
 for a saída, para o espelho nunca descartar causa em silêncio se o TGC preencher
 fora do padrão.
 
+BLOCO DE ABATE (`CA_LOTESAIDA`, `CA_RC_SAIDA`, `CA_PESO_ARR_SAIDA`, ago/2026) — liga o
+animal ao fechamento por lote de abate e traz o resultado individual do abate:
+
+  * COD_LOTE_SAIDA (`CA_LOTESAIDA`) é a CHAVE DO FECHAMENTO: aponta para
+    `lotes_saida_tgc.cod_lote_saida` (CLS_CODIGO, feed `lotes_saida`). Preenchida em
+    3.184 dos 9.392 animais da base real — exatamente a mesma contagem das pesagens de
+    tipo SAIDA — e nunca 0, com zero órfãos contra CAD_LOTESAIDA.
+  * RC_SAIDA (`CA_RC_SAIDA`) e ARROBAS_SAIDA (`CA_PESO_ARR_SAIDA`) são o RC real e a
+    arroba de carcaça POR ANIMAL. Preenchidas em 2.258 animais e NUNCA 0: ou o TGC tem
+    o número, ou a coluna é NULL. Note a assimetria contra o COD_LOTE_SAIDA — 926
+    animais estão num lote de abate sem RC/arroba individual, e o relatório precisa
+    tratar isso como ausência, não como zero.
+
+Os três NÃO entram no bloco condicional de saída (que existe porque CA_VALORSAIDA fica
+0,00 no rebanho vivo inteiro): aqui não há sentinela zero a filtrar, e um dado que o
+TGC preencher fora do padrão de SAIDA nunca deve ser descartado em silêncio — mesmo
+racional da CAUSA_MORTE.
+
+ATENÇÃO À ORDEM: este feed é order=30 e `lotes_saida` é order=61, então no primeiro
+ciclo o animal chega ao destino antes do lote de abate que ele referencia. É
+tolerável porque `animais_tgc.cod_lote_saida` é TEXT sem FK — a referência resolve no
+mesmo ciclo, quando `lotes_saida` roda. Não inverta a ordem sem checar: `animais` é
+pré-requisito de `pesagens` (order=60) e de todo o bloco de fechamento.
+
 Renaming a field (PESO_BALANCINHA→PESO_ENTRADA) or adding a column (VALOR_ENTRADA,
-CAUSA_MORTE) changes every ``row_hash``, so the first cycle after such a change
-re-sends the whole herd once. That is intended — the destination is rebuilding.
-VALOR_ENTRADA e CAUSA_MORTE entram JUNTOS nesta release: o re-envio único do rebanho
-já previsto pelo VALOR_ENTRADA absorve a CAUSA_MORTE sem um segundo re-envio.
+CAUSA_MORTE, o bloco de abate) changes every ``row_hash``, so the first cycle after
+such a change re-sends the whole herd once. That is intended — the destination is
+rebuilding. VALOR_ENTRADA e CAUSA_MORTE entraram JUNTOS numa release; o bloco de abate
+entra na seguinte, cada uma com o seu re-envio único do rebanho.
 
 Data-quality problems (RC_ENTRADA > 100, duplicate SISBOV, ...) are NOT filtered out
 locally — every animal is sent so the destination surfaces the issue. Corrections happen
@@ -135,7 +159,10 @@ class AnimaisEndpoint(BatchEndpoint):
             a.CA_CAUSAMORTE      AS CAUSA_MORTE,
             a.CA_DATASAIDA       AS DATA_SAIDA,
             a.CA_PESO_SAIDA      AS PESO_SAIDA,
-            a.CA_VALORSAIDA      AS VALOR_SAIDA
+            a.CA_VALORSAIDA      AS VALOR_SAIDA,
+            a.CA_LOTESAIDA       AS COD_LOTE_SAIDA,
+            a.CA_RC_SAIDA        AS RC_SAIDA,
+            a.CA_PESO_ARR_SAIDA  AS ARROBAS_SAIDA
         FROM CAD_ANIMAL a
         LEFT JOIN CAD_CATEGORIA cat ON cat.CCAT_CODIGO = a.CA_CODCATEGORIA
         LEFT JOIN CAD_RACA      rac ON rac.CR_CODIGO   = a.CA_CODRACA
@@ -167,6 +194,12 @@ class AnimaisEndpoint(BatchEndpoint):
             "RC_ENTRADA": num(row.get("RC_ENTRADA")),
             "IDADE": integer(row.get("IDADE")),
             "NUM_CONTRATO": opt_str(row.get("NUM_CONTRATO")),
+            # bloco de abate: chave do fechamento + resultado individual do abate.
+            # Fora do gate do bloco de saída de propósito — não há sentinela zero aqui
+            # (nunca 0 na base real, só NULL ou valor). Ver docstring do módulo.
+            "COD_LOTE_SAIDA": opt_code(row.get("COD_LOTE_SAIDA")),
+            "RC_SAIDA": num(row.get("RC_SAIDA")),
+            "ARROBAS_SAIDA": num(row.get("ARROBAS_SAIDA")),
         }
 
         # identifiers: sent only when present (mirrors the validated payload)

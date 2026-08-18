@@ -17,6 +17,7 @@ def _row(**over):
         "NUM_CONTRATO": "1",
         "SAIDA": "NENHUM", "CAUSA_MORTE": None, "DATA_SAIDA": None, "PESO_SAIDA": None,
         "VALOR_SAIDA": Decimal("0.00"),
+        "COD_LOTE_SAIDA": None, "RC_SAIDA": None, "ARROBAS_SAIDA": None,
     }
     base.update(over)
     return base
@@ -149,7 +150,41 @@ def test_extract_spec_builds_query():
     assert "CAD_RACA" in spec.sql and "CA_DATAREG" in spec.sql
     assert "a.CA_VALORENT        AS VALOR_ENTRADA" in spec.sql
     assert "a.CA_CAUSAMORTE      AS CAUSA_MORTE" in spec.sql
+    assert "a.CA_LOTESAIDA       AS COD_LOTE_SAIDA" in spec.sql
+    assert "a.CA_RC_SAIDA        AS RC_SAIDA" in spec.sql
+    assert "a.CA_PESO_ARR_SAIDA  AS ARROBAS_SAIDA" in spec.sql
+    # CA_RC_SAIDA_PROJ é o RC PROJETADO (outra coluna da mesma tabela): o fechamento
+    # quer o RC realizado, então a projeção não entra no espelho
+    assert "CA_RC_SAIDA_PROJ" not in spec.sql
     assert spec.incremental is False
+
+
+def test_bloco_de_abate_viaja_fora_do_gate_do_bloco_de_saida():
+    """CA_LOTESAIDA é a CHAVE do fechamento (3.184 dos 9.392 animais da base real,
+    exatamente a contagem das pesagens de tipo SAIDA) e CA_RC_SAIDA/CA_PESO_ARR_SAIDA
+    são o resultado individual do abate. Os três ficam FORA do bloco condicional de
+    saída de propósito: ali o gate existe porque CA_VALORSAIDA fica 0,00 no rebanho
+    vivo inteiro, e aqui não há sentinela zero a filtrar — na base real essas colunas
+    são NULL ou têm valor, nunca 0."""
+    ep = AnimaisEndpoint()
+    r = ep.transform(_row(COD_LOTE_SAIDA=24, RC_SAIDA=Decimal("49.74"),
+                          ARROBAS_SAIDA=Decimal("9.80")))
+    assert r["COD_LOTE_SAIDA"] == "24"      # join com lotes_saida_tgc.cod_lote_saida
+    assert r["RC_SAIDA"] == 49.74 and r["ARROBAS_SAIDA"] == 9.8
+    # animal vivo: as chaves existem no payload com None, nunca somem
+    vivo = ep.transform(_row())
+    assert vivo["COD_LOTE_SAIDA"] is None
+    assert vivo["RC_SAIDA"] is None and vivo["ARROBAS_SAIDA"] is None
+
+
+def test_animal_em_lote_de_abate_sem_rc_individual():
+    """Assimetria real da base: 3.184 animais têm CA_LOTESAIDA mas só 2.258 têm
+    CA_RC_SAIDA. Os 926 restantes têm que chegar ao destino como ausência (None), não
+    como zero."""
+    r = AnimaisEndpoint().transform(_row(COD_LOTE_SAIDA=8, RC_SAIDA=None,
+                                         ARROBAS_SAIDA=None))
+    assert r["COD_LOTE_SAIDA"] == "8"
+    assert r["RC_SAIDA"] is None and r["ARROBAS_SAIDA"] is None
 
 
 class _Resp:
