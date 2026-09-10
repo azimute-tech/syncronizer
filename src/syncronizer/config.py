@@ -167,7 +167,7 @@ class Settings(BaseSettings):
 
     # --- indicadores (raspagem noturna do CEPEA boi gordo -> API do AgroDB) ---
     # reusa [api] (POST /api/integracoes/indicadores com o mesmo auth); sem segredos novos.
-    indicadores_enabled: bool = False
+    indicadores_enabled: bool = True
     indicadores_hour: int = 20       # horário LOCAL (America/Sao_Paulo); convertido p/ UTC no cron
     indicadores_minute: int = 30     # minuto (horário local)
 

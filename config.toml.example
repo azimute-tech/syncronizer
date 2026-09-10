@@ -85,7 +85,7 @@ min_free_disk_multiplier = 2.5 # exige disco livre >= mult * tamanho do .fdb ant
 # (POST /api/integracoes/indicadores com o mesmo auth); SEM segredos novos.
 # TODAS as fazendas enviam o mesmo indicador do dia — a API faz upsert por
 # (indicador, data), então re-envio é sucesso normal (idempotente de ponta a ponta).
-enabled = false
+enabled = true
 # Horário em HORÁRIO LOCAL (mesmo offset de [runtime].tz_offset_hours). Roda 1x/dia;
 # se falhar (internet fora), um catch-up (a cada 30min) retenta no mesmo dia até
 # concluir — no máximo 1 sucesso/dia por instância.
