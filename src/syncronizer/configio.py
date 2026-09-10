@@ -45,6 +45,9 @@ FIELDS = [
     ("backup_compression", "Compressão (gzip / xz)", "text", "Backup", False, False),
     ("backup_temp_dir", "Diretório temporário (vazio = padrão)", "text", "Backup", True, False),
     ("backup_max_retries", "Tentativas de upload", "int", "Backup", False, False),
+    ("indicadores_enabled", "Envio noturno do CEPEA boi gordo habilitado", "bool", "Indicadores", False, False),
+    ("indicadores_hour", "Hora do envio (horário local; ex.: 20)", "int", "Indicadores", False, False),
+    ("indicadores_minute", "Minuto do envio (horário local)", "int", "Indicadores", False, False),
 ]
 
 _TYPES = {f[0]: f[2] for f in FIELDS}
