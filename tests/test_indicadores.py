@@ -304,7 +304,7 @@ def test_indicadores_config_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("SYNCRONIZER_DATA_DIR", str(tmp_path))
     from syncronizer.config import load_settings
     s = load_settings()
-    assert s.indicadores_enabled is False   # default: desligado
+    assert s.indicadores_enabled is True    # default: ligado (todo instalador envia o CEPEA)
     assert s.indicadores_hour == 20
     assert s.indicadores_minute == 30
 

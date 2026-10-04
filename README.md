@@ -44,6 +44,18 @@ pytest                                # unit tests (no Firebird required)
 `config.toml` is read from `$SYNCRONIZER_DATA_DIR/config/config.toml`; env vars
 (`SYNC_*`) override it. See `config.toml.example`.
 
+Nightly jobs (local time, same `tz_offset_hours`):
+
+- **Indicadores (CEPEA boi gordo)** — `[indicadores] enabled`, **ligado por padrão**
+  (20:30). Envia o Indicador do Boi Gordo CEPEA/B3 para `POST /api/integracoes/indicadores`
+  reusando o auth de `[api]`; desligue só por decisão explícita (painel ou config.toml).
+- **Backup** — `[backup] enabled`, desligado por padrão.
+
+`config.toml` carries a `config_version`. Files without it (v1) are migrated once at
+boot by `configio.migrate_config`: v2 turns `[indicadores] enabled = false` back on,
+since before v2 that value could only be the old default (the panel had no such field).
+The admin panel stamps the current version on every save, so later choices are kept.
+
 ## Add an endpoint
 
 Copy `src/syncronizer/endpoints/_template.py` to `endpoints/<name>.py`, fill in
