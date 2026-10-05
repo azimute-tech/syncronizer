@@ -9,6 +9,7 @@ backslash/encoding bugs that plagued hand-edited config simply cannot happen.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 try:  # Python 3.11+
@@ -49,6 +50,15 @@ FIELDS = [
     ("indicadores_hour", "Hora do envio (horário local; ex.: 20)", "int", "Indicadores", False, False),
     ("indicadores_minute", "Minuto do envio (horário local)", "int", "Indicadores", False, False),
 ]
+
+# Versão do esquema do config.toml. Permite migrar, UMA vez, valores que eram só o
+# default antigo gravado no arquivo (o painel grava TODOS os campos do formulário ao
+# salvar, então um default vira valor "explícito" no disco sem ninguém ter escolhido).
+#   1 (ou ausente) -> 2: CEPEA (`indicadores_enabled`) passa a nascer ligado. Antes da
+#   v2 o campo não existia no painel; um `false` no arquivo só podia vir do
+#   config.toml.example antigo (default desligado), nunca de uma escolha pela UI.
+CONFIG_VERSION = 2
+_VERSION_KEY = "config_version"
 
 _TYPES = {f[0]: f[2] for f in FIELDS}
 _PATH_FIELDS = {f[0] for f in FIELDS if f[4]}
@@ -116,11 +126,83 @@ def write_flat(path: Path, values: dict) -> None:
 
 
 def save_config(path: Path, posted: dict) -> None:
-    """Merge posted fields into the existing config and write it back safely."""
+    """Merge posted fields into the existing config and write it back safely.
+
+    Migra antes (no-op se já está na versão atual) e carimba ``config_version`` —
+    assim o arquivo criado pelo painel numa instalação nova já nasce na versão atual
+    e uma migração futura não confunde a escolha do operador com default antigo.
+    """
+    migrate_config(path)
     merged = read_flat(path)
     for key, value in posted.items():
+        if key == _VERSION_KEY:
+            continue  # versão é do esquema, não do formulário
         merged[key] = coerce(key, value)
+    merged[_VERSION_KEY] = CONFIG_VERSION
     write_flat(path, merged)
+
+
+_SECTION_RE = re.compile(r"^\s*\[\s*([A-Za-z0-9_.-]+)\s*\]\s*(#.*)?$")
+_FLAT_INDICADORES_OFF = re.compile(r"^(\s*indicadores_enabled\s*=\s*)false\b(.*)$")
+_GROUPED_ENABLED_OFF = re.compile(r"^(\s*enabled\s*=\s*)false\b(.*)$")
+
+
+def migrate_config(path: Path) -> list:
+    """Migra o config.toml para :data:`CONFIG_VERSION` (idempotente).
+
+    Edita o texto linha a linha (preserva comentários e o formato agrupado ou
+    plano), valida o resultado com ``tomllib`` e grava de forma atômica. Arquivo
+    ausente é no-op: os defaults do código já valem e o painel carimba a versão no
+    primeiro "Salvar". Retorna a lista de mudanças aplicadas (vazia = nada a fazer).
+    """
+    path = Path(path)
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    doc = tomllib.loads(text)  # TOML quebrado: deixa o loader reportar o erro
+    version = doc.get(_VERSION_KEY, 1)
+    if not isinstance(version, int) or version >= CONFIG_VERSION:
+        return []
+
+    changes: list = []
+    lines = text.splitlines(keepends=True)
+    out: list = []
+    section = None
+    for line in lines:
+        body = line.rstrip("\r\n")
+        eol = line[len(body):]
+        m = _SECTION_RE.match(body)
+        if m:
+            section = m.group(1)
+            out.append(line)
+            continue
+        if version < 2:
+            hit = None
+            if section is None:
+                hit = _FLAT_INDICADORES_OFF.match(body)
+            elif section == "indicadores":
+                hit = _GROUPED_ENABLED_OFF.match(body)
+            if hit:
+                body = f"{hit.group(1)}true{hit.group(2)}"
+                changes.append("indicadores_enabled: false -> true (default antigo; CEPEA agora ligado)")
+        out.append(body + eol)
+
+    # chave de topo precisa vir antes da primeira tabela: entra logo após o
+    # cabeçalho de comentários (ou no início do arquivo).
+    insert_at = 0
+    while insert_at < len(out) and out[insert_at].lstrip().startswith("#"):
+        insert_at += 1
+    if out and not out[-1].endswith(("\n", "\r")):
+        out[-1] += "\n"
+    out.insert(insert_at, f"{_VERSION_KEY} = {CONFIG_VERSION}\n")
+    changes.append(f"{_VERSION_KEY}: {version} -> {CONFIG_VERSION}")
+
+    new_text = "".join(out)
+    tomllib.loads(new_text)  # nunca grava um arquivo que o loader não leria
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(new_text, encoding="utf-8")
+    os.replace(tmp, path)
+    return changes
 
 
 def form_model(current: dict) -> list:

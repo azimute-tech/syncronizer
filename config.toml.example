@@ -6,6 +6,11 @@
 # git working tree and is .gitignored — it must NEVER be committed to the public repo.
 # Any value can also be supplied/overridden by a SYNC_<UPPER_FIELD> environment variable.
 
+# Versão do esquema deste arquivo (NÃO editar). Arquivos sem ela são tratados como
+# v1 e migrados uma vez no boot — ex.: v2 religa [indicadores].enabled = false
+# herdado do default antigo. Com a versão atual, o valor escrito aqui é respeitado.
+config_version = 2
+
 [firebird]
 # REQUIRED: absolute path to the local Firebird 2.5 .fdb (raw path; do not URL-encode).
 path = "C:\\data\\app.fdb"
@@ -85,6 +90,7 @@ min_free_disk_multiplier = 2.5 # exige disco livre >= mult * tamanho do .fdb ant
 # (POST /api/integracoes/indicadores com o mesmo auth); SEM segredos novos.
 # TODAS as fazendas enviam o mesmo indicador do dia — a API faz upsert por
 # (indicador, data), então re-envio é sucesso normal (idempotente de ponta a ponta).
+# LIGADO por padrão: desligue só por decisão explícita (painel local ou aqui).
 enabled = true
 # Horário em HORÁRIO LOCAL (mesmo offset de [runtime].tz_offset_hours). Roda 1x/dia;
 # se falhar (internet fora), um catch-up (a cada 30min) retenta no mesmo dia até

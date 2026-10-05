@@ -167,6 +167,9 @@ class Settings(BaseSettings):
 
     # --- indicadores (raspagem noturna do CEPEA boi gordo -> API do AgroDB) ---
     # reusa [api] (POST /api/integracoes/indicadores com o mesmo auth); sem segredos novos.
+    # Ligado por padrão (PR #9): toda fazenda envia o indicador do dia e a API faz
+    # upsert por (indicador, data). Instalações antigas com `false` herdado do default
+    # anterior são religadas uma vez pela migração v2 do config.toml (configio).
     indicadores_enabled: bool = True
     indicadores_hour: int = 20       # horário LOCAL (America/Sao_Paulo); convertido p/ UTC no cron
     indicadores_minute: int = 30     # minuto (horário local)
@@ -202,6 +205,28 @@ class ConfigError(RuntimeError):
     """Raised for missing/invalid configuration with an actionable message."""
 
 
+def _migrate_config_file() -> None:
+    """Aplica as migrações de esquema do config.toml antes de ler (idempotente).
+
+    Nunca impede o boot: se a migração falhar, o arquivo fica como estava e o
+    loader segue (um TOML inválido continua sendo reportado pelo próprio loader).
+    """
+    import logging
+
+    from . import configio
+
+    path = resolve_data_dir() / "config" / "config.toml"
+    log = logging.getLogger(__name__)
+    try:
+        changes = configio.migrate_config(path)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("migração do config.toml não aplicada (%s): %s", path, exc)
+        return
+    for change in changes:
+        log.warning("config.toml migrado: %s", change)
+
+
 def load_settings() -> Settings:
     """Build :class:`Settings` from all configured sources."""
+    _migrate_config_file()
     return Settings()

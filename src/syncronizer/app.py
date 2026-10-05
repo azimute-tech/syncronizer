@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import logging
 
+from .ciclo import CicloNotifier
+from .ciclo import build_payload as build_ciclo_payload
 from .config import Settings, load_settings
 from .core import orchestrator, registry
 from .core.migrations import run_migrations
@@ -31,6 +33,7 @@ class Application:
             self.settings.api_timeout, self.settings.api_max_retries,
             api_key=self.settings.api_key, api_key_header=self.settings.api_key_header,
         )
+        self.ciclo_notifier = CicloNotifier(self.store, self.http, log)
         self.endpoints = registry.discover(log=log)
         log.info(
             "discovered %d endpoint(s): %s",
@@ -44,6 +47,13 @@ class Application:
 
     def run_cycle(self):
         log.info("CYCLE START")
+        iniciado_em = now_iso()
+        # Aviso de fim de ciclo que ficou pendente (internet/API fora): tenta de novo
+        # já no começo, mesmo que o Firebird esteja fora neste ciclo.
+        try:
+            self.ciclo_notifier.flush()
+        except Exception as exc:  # noqa: BLE001 - nunca derruba o ciclo
+            log.warning("ciclo-concluido: erro ao reenviar pendente: %s", exc)
         fb = FirebirdClient(self.settings, log=log)
         try:
             stats = orchestrator.run_cycle(
@@ -55,6 +65,14 @@ class Application:
         self.last_cycle_at = now_iso()
         self.last_fb_ok = stats.firebird_available
         log.info("CYCLE END %s", summary_line(fb=stats.firebird_available, **totals))
+        # Avisa a API que a carga do ciclo terminou (só se o ciclo leu o Firebird;
+        # sem ele não houve carga nova a recalcular). Sempre, mesmo sem mudança.
+        if stats.firebird_available:
+            try:
+                self.ciclo_notifier.notify(
+                    build_ciclo_payload(stats, iniciado_em, self.last_cycle_at))
+            except Exception as exc:  # noqa: BLE001 - nunca derruba o ciclo
+                log.warning("ciclo-concluido: erro ao avisar fim de ciclo: %s", exc)
         # Per-endpoint backlog/progress so the log shows how much is left to send.
         for ep in self.endpoints:
             c = self.store.endpoint_counts(ep.name)
