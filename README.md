@@ -56,6 +56,38 @@ boot by `configio.migrate_config`: v2 turns `[indicadores] enabled = false` back
 since before v2 that value could only be the old default (the panel had no such field).
 The admin panel stamps the current version on every save, so later choices are kept.
 
+## Aviso de fim de ciclo (`ciclo-concluido`)
+
+Ao fim de todo ciclo que **leu o Firebird**, o serviço faz
+`POST /api/integracoes/tgc/ciclo-concluido` (mesma URL base e mesmo auth de `[api]`):
+
+```json
+{ "ciclo_id": "…", "iniciado_em": "…", "concluido_em": "…",
+  "recursos": { "<endpoint>": { "enviados": 0, "falhas": 0 } } }
+```
+
+A API responde `{ versao, recalculado }` (logado em INFO) e recalcula os derivados da
+fazenda uma vez por ciclo, em vez de a cada lote recebido.
+
+- **Sempre avisa**, mesmo num ciclo sem mudança: é um POST pequeno e deixa a API
+  recalcular uma fazenda que ficou pendente. Quem decide recalcular é a API.
+- **Sem Firebird, sem aviso**: não houve carga nova.
+- **Repete até confirmar**: o aviso é gravado no `control.db` (`_sync_meta`,
+  chave `ciclo_concluido_pendente`) antes de enviar; 3 tentativas no ciclo (esperas de
+  2 s e 5 s) para rede/5xx/408/429; timeout não repete no ciclo. O que sobrar é reenviado
+  no início e no fim dos próximos ciclos — inclusive após reiniciar o serviço. Avisos
+  pendentes se fundem num só (último `ciclo_id`, `iniciado_em` mais antigo, contadores
+  somados), então uma queda de internet não vira uma rajada de recálculos.
+- **404** (API antiga, sem a rota): um WARNING, descarta o pendente e para de avisar até
+  o serviço reiniciar. Outro 4xx (400/401/403): WARNING e descarta (repetir não resolve).
+  Em ambos a API ainda recalcula sozinha a fazenda pendente há mais de 15 min.
+
+### Intervalo do ciclo
+
+É só configuração: `cycle_minutes` em `[runtime]` do `config.toml` (ou o campo
+"Intervalo do ciclo (min)" no painel), seguido de **Reiniciar** no painel — o agendador
+lê o valor no boot. Para 15 min: `cycle_minutes = 15`. O padrão continua 10.
+
 ## Add an endpoint
 
 Copy `src/syncronizer/endpoints/_template.py` to `endpoints/<name>.py`, fill in
