@@ -165,7 +165,7 @@ class Settings(BaseSettings):
     backup_max_retries: int = 3      # tentativas do triplete upload-url->PUT->confirm
     backup_min_free_disk_multiplier: float = 2.5  # disco livre >= mult * tamanho do .fdb
 
-    # --- indicadores (raspagem noturna do CEPEA boi gordo -> API do AgroDB) ---
+    # --- indicadores (coleta noturna CEPEA + DATAGRO boi gordo -> API do AgroDB) ---
     # reusa [api] (POST /api/integracoes/indicadores com o mesmo auth); sem segredos novos.
     # Ligado por padrão (PR #9): toda fazenda envia o indicador do dia e a API faz
     # upsert por (indicador, data). Instalações antigas com `false` herdado do default
@@ -173,6 +173,9 @@ class Settings(BaseSettings):
     indicadores_enabled: bool = True
     indicadores_hour: int = 20       # horário LOCAL (America/Sao_Paulo); convertido p/ UTC no cron
     indicadores_minute: int = 30     # minuto (horário local)
+    # Fonte DATAGRO (Indicador do Boi SP, 5 dias por coleta) dentro do mesmo job.
+    # Desligar aqui deixa só o CEPEA; o status do job não conta a fonte desligada.
+    indicadores_datagro_enabled: bool = True
 
     @classmethod
     def settings_customise_sources(

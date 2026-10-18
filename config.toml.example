@@ -85,13 +85,18 @@ max_retries = 3                # tentativas do triplete upload-url -> PUT -> con
 min_free_disk_multiplier = 2.5 # exige disco livre >= mult * tamanho do .fdb antes do gbak
 
 [indicadores]
-# Raspagem noturna do Indicador do Boi Gordo CEPEA/B3 (CEPEA-ESALQ/USP, à vista, base SP,
-# R$/@) e envio à API do AgroDB (preço default da simulação de venda). Reusa [api]
-# (POST /api/integracoes/indicadores com o mesmo auth); SEM segredos novos.
+# Coleta noturna dos indicadores do boi gordo (R$/@) e envio à API do AgroDB. Reusa [api]
+# (POST /api/integracoes/indicadores com o mesmo auth); SEM segredos novos. Duas fontes,
+# cada uma isolada (uma fora do ar não derruba a outra):
+#   - CEPEA  (CEPEA_BOI_GORDO): Indicador do Boi Gordo CEPEA/B3, 1 dia por coleta.
+#   - DATAGRO (DATAGRO_BOI_GORDO_SP): Indicador do Boi DATAGRO praça SP (o da liquidação
+#     do BGI na B3), 5 últimos dias úteis por coleta, do boletim_cinco.svg da DATAGRO.
+#     `datagro_enabled = false` desliga só esta fonte.
 # TODAS as fazendas enviam o mesmo indicador do dia — a API faz upsert por
 # (indicador, data), então re-envio é sucesso normal (idempotente de ponta a ponta).
 # LIGADO por padrão: desligue só por decisão explícita (painel local ou aqui).
 enabled = true
+datagro_enabled = true
 # Horário em HORÁRIO LOCAL (mesmo offset de [runtime].tz_offset_hours). Roda 1x/dia;
 # se falhar (internet fora), um catch-up (a cada 30min) retenta no mesmo dia até
 # concluir — no máximo 1 sucesso/dia por instância.

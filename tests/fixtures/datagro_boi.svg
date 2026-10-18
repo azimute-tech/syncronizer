@@ -1,0 +1,33 @@
+  <svg version="1.1" id="svg-map" xmlns="http://www.w3.org/2000/svg" 
+  xmlns:xlink="http://www.w3.org/1999/xlink" 
+  x="0px" y="0px" width="945px" height="945px" 
+  xml:space="preserve">
+
+<g>
+
+	<image x="0" y="0" 
+		width="945" height="945" 
+		xlink:href="data:image/png;base64,REMOVIDO"
+	/>
+
+	<image x="340" y="670" 
+		width="180" height="60" 
+		xlink:href="data:image/png;base64,REMOVIDO"
+	/>
+
+	<defs>
+    <filter x="0" y="0" width="1" height="1" id="selo">
+      <feFlood flood-color="yellow" result="bg" />
+      <feMerge>
+        <feMergeNode in="bg"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  
+    <filter x="0" y="0" width="1" height="1" id="selosimples">
+      <feFlood flood-color="yellow"/>
+      <feComposite in="SourceGraphic" operator="xor"/>
+    </filter>
+	</defs>
+<text transform="matrix(1 0 0 1 460 422)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">366,47</text><text transform="matrix(1 0 0 1 640 422)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:green; ">1,36%</text><text transform="matrix(1 0 0 1 780 422)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">72,24</text><text transform="matrix(1 0 0 1 460 566)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">370,18</text><text transform="matrix(1 0 0 1 640 566)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:green; ">0,31%</text><text transform="matrix(1 0 0 1 780 566)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">72,97</text><text transform="matrix(1 0 0 1 460 470)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">356,80</text><text transform="matrix(1 0 0 1 640 470)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:green; ">0,37%</text><text transform="matrix(1 0 0 1 780 470)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">70,33</text><text transform="matrix(1 0 0 1 460 518)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">375,19</text><text transform="matrix(1 0 0 1 640 518)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:green; ">0,17%</text><text transform="matrix(1 0 0 1 780 518)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">73,96</text><text transform="matrix(1 0 0 1 460 712)" text-anchor="end"  font-weight="bold"  font-family="Arial, Helvetica, sans-serif"  font-size="1.4em"  style=" fill:black; ">380,42</text><text transform="matrix(1 0 0 1 640 712)" text-anchor="end"  font-weight="bold"  font-family="Arial, Helvetica, sans-serif"  font-size="1.4em"  style=" fill:green; ">0,11%</text><text transform="matrix(1 0 0 1 780 712)" text-anchor="end"  font-weight="bold"  font-family="Arial, Helvetica, sans-serif"  font-size="1.4em"  style=" fill:black; ">74,99</text><text transform="matrix(1 0 0 1 460 664)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">356,74</text><text transform="matrix(1 0 0 1 640 664)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:green; ">0,17%</text><text transform="matrix(1 0 0 1 780 664)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">70,32</text><text transform="matrix(1 0 0 1 460 758)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">362,45</text><text transform="matrix(1 0 0 1 640 758)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:green; ">0,16%</text><text transform="matrix(1 0 0 1 780 758)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">71,45</text><text transform="matrix(1 0 0 1 460 614)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">365,25</text><text transform="matrix(1 0 0 1 640 614)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:green; ">0,03%</text><text transform="matrix(1 0 0 1 780 614)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">72,00</text><text transform="matrix(1 0 0 1 460 374)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">355,00</text><text transform="matrix(1 0 0 1 640 374)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:green; ">0,01%</text><text transform="matrix(1 0 0 1 780 374)" text-anchor="end"  font-weight="normal"  font-family="Arial, Helvetica, sans-serif"  font-size="1.3em"  style=" fill:black; ">69,98</text><text x="820" y="252" text-anchor="end" font-weight="bold" font-size="1.4em"  font-family="Arial, Helvetica, sans-serif"  style="fill:black">16/Out/2026</text>
+</g></svg>

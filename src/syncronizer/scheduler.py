@@ -100,9 +100,10 @@ def run_service(app, log) -> None:
     def indicadores_catchup_job():
         # Recupera o envio do dia se as 20:30 falharam (ex.: internet da fazenda fora).
         # Só dispara depois do horário agendado e só se o envio de hoje ainda não foi
-        # OK — no máximo 1 sucesso/dia por instância (re-envio de outra fazenda é
-        # normal: a API faz upsert por indicador+data). Após a meia-noite local vira
-        # outro dia e para sozinho até o cron do próximo dia.
+        # OK nas DUAS fontes (CEPEA + DATAGRO) — no máximo 1 sucesso/dia por instância
+        # (re-envio de outra fazenda é normal: a API faz upsert por indicador+data).
+        # A fonte que já deu certo hoje é reaproveitada; só a pendente é refeita.
+        # Após a meia-noite local vira outro dia e para sozinho até o cron do próximo dia.
         try:
             from .indicadores import indicadores_done_today
             ln = timewin.local_now(s)
@@ -135,7 +136,12 @@ def run_service(app, log) -> None:
         ih, im = timewin.local_hm_to_utc(s, s.indicadores_hour, s.indicadores_minute)
         sched.add_job(indicadores_job, "cron", hour=ih, minute=im, id="indicadores")
         sched.add_job(indicadores_catchup_job, "interval", minutes=30, id="indicadores_catchup")
-        log.info("indicadores agendado: %02d:%02d local (=%02d:%02d UTC); catch-up a cada 30min",
+        # E uma vez logo após o boot: o serviço relançado pelo self-update depois do
+        # horário agendado (ou a máquina ligada tarde) não espera até 30 min pelo
+        # interval — se o envio de hoje não está completo, coleta já.
+        sched.add_job(indicadores_catchup_job, "date", run_date=now + timedelta(seconds=90),
+                      id="indicadores_catchup_boot")
+        log.info("indicadores agendado: %02d:%02d local (=%02d:%02d UTC); catch-up a cada 30min e 90s após o boot",
                  s.indicadores_hour, s.indicadores_minute, ih, im)
     if s.run_on_start:
         sched.add_job(etl_job, "date", run_date=now + timedelta(seconds=1), id="startup")
