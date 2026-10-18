@@ -59,13 +59,26 @@ def read_status(paths) -> Optional[dict]:
 
 
 def indicadores_done_today(paths, settings) -> bool:
-    """True se o envio de HOJE (dia LOCAL) já concluiu OK — nas DUAS fontes.
+    """True se o envio de HOJE (dia LOCAL) já concluiu OK — em CADA fonte.
 
     Base do catch-up: no máximo 1 sucesso/dia por instância. Uma fonte ainda
-    pendente mantém ``ok=False`` e o catch-up volta a rodar (só a pendente).
+    pendente (sem bloco OK hoje) faz o catch-up voltar a rodar — só a pendente,
+    porque :func:`run_indicadores` reaproveita a que já deu certo.
+
+    Olha os BLOCOS por fonte, não o ``ok`` do topo: um status gravado por uma
+    versão anterior do serviço (só CEPEA, sem o bloco ``datagro``) não conta
+    como "feito" — é assim que uma fonte nova entra nas máquinas já instaladas
+    no mesmo dia do self-update, sem esperar o cron do dia seguinte. Fonte
+    desligada por config grava ``ok=True`` + ``skipped`` e conta como feita.
     """
     st = read_status(paths)
-    return bool(st and st.get("ok") and st.get("data_referencia") == timewin.local_today(settings))
+    if not st or st.get("data_referencia") != timewin.local_today(settings):
+        return False
+    for fonte in FONTES:
+        bloco = st.get(fonte)
+        if not (isinstance(bloco, dict) and bloco.get("ok")):
+            return False
+    return True
 
 
 def _write_status(paths, status: dict, log) -> None:

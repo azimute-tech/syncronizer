@@ -313,11 +313,25 @@ def test_indicadores_done_today(tmp_path, monkeypatch):
 
     # sem arquivo -> não feito
     assert job.indicadores_done_today(paths, s) is False
-    # OK no dia de hoje -> feito
-    status_file.write_text(json.dumps({"ok": True, "data_referencia": "2026-08-06"}))
+    # OK no dia de hoje, nas DUAS fontes -> feito
+    status_file.write_text(json.dumps({"ok": True, "data_referencia": "2026-08-06",
+                                       "cepea": {"ok": True}, "datagro": {"ok": True}}))
     assert job.indicadores_done_today(paths, s) is True
+    # DATAGRO desligado por config grava ok + skipped -> conta como feito
+    status_file.write_text(json.dumps({"ok": True, "data_referencia": "2026-08-06",
+                                       "cepea": {"ok": True},
+                                       "datagro": {"ok": True, "skipped": "desligado"}}))
+    assert job.indicadores_done_today(paths, s) is True
+    # status gravado pela versão ANTERIOR do serviço (só "ok" no topo, sem o bloco
+    # datagro): NÃO conta — o catch-up do mesmo dia coleta a fonte nova
+    status_file.write_text(json.dumps({"ok": True, "data_referencia": "2026-08-06"}))
+    assert job.indicadores_done_today(paths, s) is False
+    status_file.write_text(json.dumps({"ok": True, "data_referencia": "2026-08-06",
+                                       "cepea": {"ok": True}}))
+    assert job.indicadores_done_today(paths, s) is False
     # OK mas de ONTEM -> não feito
-    status_file.write_text(json.dumps({"ok": True, "data_referencia": "2026-08-05"}))
+    status_file.write_text(json.dumps({"ok": True, "data_referencia": "2026-08-05",
+                                       "cepea": {"ok": True}, "datagro": {"ok": True}}))
     assert job.indicadores_done_today(paths, s) is False
     # de hoje mas FALHOU (uma das fontes) -> não feito
     status_file.write_text(json.dumps({"ok": False, "data_referencia": "2026-08-06",
@@ -416,8 +430,13 @@ def _run_service(monkeypatch, **over):
 def test_scheduler_adds_indicadores_jobs_only_when_enabled(monkeypatch):
     on = _run_service(monkeypatch, indicadores_enabled=True)
     assert "indicadores" in on.jobs and "indicadores_catchup" in on.jobs
+    # catch-up também 1x logo após o boot (serviço relançado pelo self-update
+    # depois das 20:30 coleta a fonte que falta sem esperar o interval de 30min)
+    assert "indicadores_catchup_boot" in on.jobs
+    assert on.funcs["indicadores_catchup_boot"] is on.funcs["indicadores_catchup"]
     off = _run_service(monkeypatch, indicadores_enabled=False)
     assert "indicadores" not in off.jobs and "indicadores_catchup" not in off.jobs
+    assert "indicadores_catchup_boot" not in off.jobs
 
 
 def test_scheduler_indicadores_catchup_gating(monkeypatch):
