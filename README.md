@@ -46,9 +46,25 @@ pytest                                # unit tests (no Firebird required)
 
 Nightly jobs (local time, same `tz_offset_hours`):
 
-- **Indicadores (CEPEA boi gordo)** — `[indicadores] enabled`, **ligado por padrão**
-  (20:30). Envia o Indicador do Boi Gordo CEPEA/B3 para `POST /api/integracoes/indicadores`
-  reusando o auth de `[api]`; desligue só por decisão explícita (painel ou config.toml).
+- **Indicadores (CEPEA + DATAGRO boi gordo)** — `[indicadores] enabled`, **ligado por
+  padrão** (20:30). Um job, duas fontes, cada uma isolada (uma fora do ar não derruba a
+  outra), um `POST /api/integracoes/indicadores` por fonte reusando o auth de `[api]`:
+  - **CEPEA** (`CEPEA_BOI_GORDO`): Indicador do Boi Gordo CEPEA/B3, 1 dia por coleta
+    (widget `widgetproduto.js.php`).
+  - **DATAGRO** (`DATAGRO_BOI_GORDO_SP`, `[indicadores] datagro_enabled`): Indicador do
+    Boi DATAGRO praça SP — o que a B3 usa para liquidar o BGI. Fonte oficial é o
+    `https://pec.datagro.com/pec/mapas/boletim_cinco.svg` (últimos **5 dias úteis** com
+    cotação; 5 itens por coleta, então uma noite sem rodar não deixa buraco). O SVG não
+    traz o ano: **ano corrente, ou o anterior se o mês da data está à frente do mês de
+    hoje** (virada de ano); o `boi.svg` (data com ano) confere a inferência e o JSON
+    `quadros` da DATAGRO só confirma o último dia (divergência = warning, o boletim vai
+    mesmo assim). Formato diferente do esperado (menos de 5 datas, SP ausente, valor fora
+    de R$ 100–1000/@, média do SVG ≠ média dos 5 valores) falha fechado: nada é enviado.
+
+  Status em `state/indicadores/last_indicadores.json`: `ok` global = as duas fontes OK,
+  com um bloco `cepea` e um `datagro`. O catch-up (a cada 30 min) refaz só a fonte
+  pendente; `indicadores-once` refaz as duas. Desligue só por decisão explícita (painel
+  ou config.toml).
 - **Backup** — `[backup] enabled`, desligado por padrão.
 
 `config.toml` carries a `config_version`. Files without it (v1) are migrated once at

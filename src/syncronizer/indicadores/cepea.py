@@ -27,21 +27,17 @@ O "no máximo 1 sucesso/dia" é por instância local (gating do catch-up no
 scheduler); o payload não carrega NADA específico da fazenda (o indicador é
 nacional; o token de autenticação já identifica quem enviou).
 
-``run_indicadores`` NUNCA levanta: captura tudo, loga e grava o status em
-``state/indicadores/last_indicadores.json``. Um :class:`threading.Lock`
-module-level serializa cron + catch-up + disparo manual (indicadores-once).
+:func:`run_cepea` NUNCA levanta: captura tudo, loga e devolve o BLOCO ``cepea``
+do status. Quem orquestra as fontes (CEPEA + DATAGRO), grava
+``state/indicadores/last_indicadores.json`` e serializa cron + catch-up +
+disparo manual é :mod:`syncronizer.indicadores.job`.
 """
 from __future__ import annotations
 
-import json
-import os
 import re
-import threading
-from datetime import datetime, timezone
+from datetime import datetime
 
 import requests
-
-from .. import timewin
 
 # Widget oficial do CEPEA para o indicador 2 (Boi Gordo CEPEA/B3). O %5B%5D é
 # "[]" URL-encoded (o endpoint aceita múltiplos id_indicador[]).
@@ -66,9 +62,6 @@ _USER_AGENT = (
 
 # (connect, read) do GET do widget — resposta é ~2 KB, mas a internet rural é lenta.
 _FETCH_TIMEOUT = (10, 30)
-
-# Serializa cron + catch-up + disparo manual: um envio por vez.
-_LOCK = threading.Lock()
 
 _CELL_RE = re.compile(r"<t[dh][^>]*>(.*?)</t[dh]>", re.IGNORECASE | re.DOTALL)
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -160,82 +153,63 @@ def send_indicador(http, parsed: dict) -> dict:
     return resp.json() if resp.content else {}
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def conferir_resposta(confirmed: dict, n_itens: int, rotulo: str, log) -> dict:
+    """Lê a resposta da API (``{inserted, updated, errors[], avisos[]}``) e falha
+    se algum item NÃO foi gravado.
 
-
-def read_status(paths) -> dict | None:
-    """Lê state/indicadores/last_indicadores.json (ou None se ausente/ilegível)."""
-    try:
-        with open(paths.indicadores_dir / "last_indicadores.json", "r", encoding="utf-8") as fh:
-            return json.load(fh)
-    except FileNotFoundError:
-        return None
-    except Exception:  # noqa: BLE001
-        return None
-
-
-def indicadores_done_today(paths, settings) -> bool:
-    """True se o envio de HOJE (dia LOCAL) já concluiu OK nesta instância.
-
-    Base do catch-up: evita repetir o envio quando o horário agendado já teve
-    sucesso — no máximo 1 sucesso/dia POR INSTÂNCIA (cada fazenda envia o seu;
-    a API absorve os N envios idênticos via upsert).
+    A rota responde **200 mesmo rejeitando itens**: o item recusado (saneamento,
+    whitelist, faixa) vai em ``errors[{index, chave, message}]`` e não entra em
+    ``inserted``/``updated``. Tratar isso como sucesso deixaria o status ``ok``
+    sem nenhuma linha no banco — foi exatamente o que aconteceu no primeiro
+    disparo contra um AgroDB ainda sem ``DATAGRO_BOI_GORDO_SP`` na whitelist.
+    Devolve o registro (``inserted``/``updated``) para o status.
     """
-    st = read_status(paths)
-    return bool(st and st.get("ok") and st.get("data_referencia") == timewin.local_today(settings))
+    record = confirmed.get("data") if isinstance(confirmed.get("data"), dict) else confirmed
+    errors = record.get("errors") or []
+    if errors:
+        detalhe = "; ".join(
+            f"[{e.get('index')}] {e.get('chave') or ''}: {e.get('message')}" for e in errors
+        )
+        raise IndicadoresError(
+            f"API rejeitou {len(errors)} de {n_itens} item(ns) do {rotulo}: {detalhe}"
+        )
+    for aviso in record.get("avisos") or []:
+        log.warning("indicadores: aviso da API (%s): %s", rotulo, aviso)
+    inserted, updated = record.get("inserted"), record.get("updated")
+    if isinstance(inserted, int) and isinstance(updated, int) and inserted + updated < n_itens:
+        raise IndicadoresError(
+            f"API confirmou só {inserted + updated} de {n_itens} item(ns) do {rotulo} "
+            f"(inserted={inserted} updated={updated}) sem apontar erro"
+        )
+    return record
 
 
-def _write_status(paths, status: dict, log) -> None:
-    """Grava o status do último envio em state/indicadores/last_indicadores.json."""
-    try:
-        paths.indicadores_dir.mkdir(parents=True, exist_ok=True)
-        target = paths.indicadores_dir / "last_indicadores.json"
-        tmp = target.with_suffix(".tmp")
-        tmp.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
-        os.replace(tmp, target)
-    except Exception as exc:  # noqa: BLE001 - status é diagnóstico, nunca quebra o job
-        log.warning("indicadores: não consegui gravar last_indicadores.json: %s", exc)
+def run_cepea(http, log) -> dict:
+    """Ciclo da fonte CEPEA: GET widget (sessão nova) -> parse/valida -> POST.
 
-
-def run_indicadores(settings, paths, http, log) -> dict:
-    """Orquestra o ciclo completo: fetch -> parse/valida -> POST. NUNCA levanta.
-
-    Ordem: GET widget (sessão nova) -> parse + validação de faixa -> POST na API
-    (``app.http`` autenticado) -> grava status. Falha em qualquer etapa vira
-    ``ok=False`` no status (e o catch-up do scheduler retenta no mesmo dia).
-    Re-envio idempotente (API responde ``updated`` em vez de ``inserted``) é
-    sucesso normal — cenário esperado com N fazendas enviando o mesmo indicador.
+    Devolve o BLOCO ``cepea`` do status (``ok``, ``indicador``, ``data_indicador``,
+    ``valor_rs``, ``inserted``/``updated`` ou ``error``) e NUNCA levanta. Falha em
+    qualquer etapa vira ``ok=False`` (o catch-up do scheduler retenta no mesmo
+    dia). Re-envio idempotente (API responde ``updated`` em vez de ``inserted``)
+    é sucesso normal — cenário esperado com N fazendas enviando o mesmo indicador.
     """
-    if not _LOCK.acquire(blocking=False):
-        log.warning("indicadores: já há um envio em andamento; ignorando este disparo")
-        return {"ok": False, "error": "envio já em andamento", "skipped": True}
-
-    data_ref = timewin.local_today(settings)
-    status: dict = {"ok": False, "data_referencia": data_ref, "started_at": _now_iso()}
+    bloco: dict = {"ok": False, "indicador": INDICADOR, "fonte": CEPEA_WIDGET_URL}
     try:
-        html = fetch_widget(log)
-        parsed = parse_widget(html)
+        parsed = parse_widget(fetch_widget(log))
         log.info("indicadores: CEPEA boi gordo %s = R$ %.2f/@",
                  parsed["data"], parsed["valor_rs"])
-        confirmed = send_indicador(http, parsed) or {}
-        record = confirmed.get("data") if isinstance(confirmed.get("data"), dict) else confirmed
-        status.update({
+        record = conferir_resposta(send_indicador(http, parsed) or {}, 1, "CEPEA", log)
+        bloco.update({
             "ok": True,
-            "indicador": INDICADOR,
             "data_indicador": parsed["data"],
             "valor_rs": parsed["valor_rs"],
             "inserted": record.get("inserted"),
             "updated": record.get("updated"),
-            "finished_at": _now_iso(),
         })
-        log.info("indicadores: concluído (data_indicador=%s, valor=R$ %.2f/@, "
+        log.info("indicadores: CEPEA concluído (data_indicador=%s, valor=R$ %.2f/@, "
                  "inserted=%s updated=%s)", parsed["data"], parsed["valor_rs"],
                  record.get("inserted"), record.get("updated"))
-    except Exception as exc:  # noqa: BLE001 - nunca levanta; grava status e segue
-        status.update({"ok": False, "error": str(exc), "finished_at": _now_iso()})
-        log.error("indicadores: FALHOU (data=%s): %s", data_ref, exc)
-    finally:
-        _write_status(paths, status, log)
-        _LOCK.release()
-    return status
+    except Exception as exc:  # noqa: BLE001 - nunca levanta; o bloco carrega o erro
+        bloco.update({"ok": False, "error": str(exc)})
+        log.error("indicadores: CEPEA FALHOU: %s", exc)
+    return bloco

@@ -4,7 +4,7 @@ service (`<venv>\\python.exe -m syncronizer run`).
 Subcommands:
   run              start the always-on scheduler (ETL + self-update jobs)
   run-once         execute a single ETL+SEND cycle and exit (first-install validation)
-  indicadores-once scrape the CEPEA boi gordo indicator and POST it to the API once
+  indicadores-once collect the CEPEA + DATAGRO boi gordo indicators and POST them to the API once
   self-check    import endpoints, open the control DB (+ optionally Firebird)
   print-config  print resolved settings + paths as JSON (secrets redacted)
   install-help  print the NSSM service registration commands
@@ -151,9 +151,10 @@ def cmd_run_once(_args) -> int:
 
 
 def cmd_indicadores_once(_args) -> int:
-    # Ciclo avulso do indicador CEPEA boi gordo (validação de staging/primeira
-    # instalação). Não abre control.db nem Firebird — só HTTP (widget + API).
-    # Exit code 1 em falha para o chamador (script de staging) detectar.
+    # Ciclo avulso dos indicadores (CEPEA + DATAGRO) para validação de staging/
+    # primeira instalação. Não abre control.db nem Firebird — só HTTP (fontes + API).
+    # force=True: refaz as duas fontes mesmo que já tenham concluído hoje.
+    # Exit code 1 se QUALQUER fonte falhou, para o chamador detectar.
     from .config import load_settings
     from .http.client import HttpClient
     from .indicadores import run_indicadores
@@ -167,7 +168,7 @@ def cmd_indicadores_once(_args) -> int:
         api_key=settings.api_key, api_key_header=settings.api_key_header,
     )
     try:
-        status = run_indicadores(settings, paths, http, log)
+        status = run_indicadores(settings, paths, http, log, force=True)
     finally:
         http.close()
     print(json.dumps(status, ensure_ascii=False, indent=2))
