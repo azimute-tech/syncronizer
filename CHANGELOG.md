@@ -13,6 +13,10 @@
 - `last_indicadores.json` passa a ter um bloco por fonte (`cepea`, `datagro`) e `ok`
   global só com as duas OK; uma fonte fora do ar não derruba a outra, e o catch-up
   refaz apenas a pendente (`indicadores-once` refaz as duas).
+- O "envio de hoje concluído" que trava o catch-up olha o bloco de CADA fonte, não
+  o `ok` do topo: um status gravado pela versão anterior (só CEPEA) não conta, e o
+  catch-up coleta o DATAGRO no mesmo dia do self-update. O catch-up também roda uma
+  vez 90 s após o boot — serviço relançado depois das 20:30 não espera o interval.
 - Aviso de fim de ciclo: `POST /api/integracoes/tgc/ciclo-concluido` ao fim de todo ciclo
   que leu o Firebird, com `enviados`/`falhas` por recurso. O AgroDB passa a recalcular os
   derivados da fazenda uma vez por ciclo.
