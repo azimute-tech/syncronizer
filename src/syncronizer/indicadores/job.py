@@ -1,27 +1,32 @@
-"""Orquestrador do job noturno de indicadores: CEPEA + DATAGRO, um status só.
+"""Orquestrador do job noturno de indicadores: fonte DATAGRO, um status só.
 
-Cada fonte roda no seu próprio try/except (:func:`cepea.run_cepea`,
-:func:`datagro.run_datagro`) e devolve um bloco; este módulo junta os blocos em
-``state/indicadores/last_indicadores.json``::
+A fonte roda em :func:`datagro.run_datagro` (que nunca levanta) e devolve um
+bloco; este módulo grava ``state/indicadores/last_indicadores.json``::
 
     {
-      "ok": true,                      # cepea.ok AND datagro.ok
+      "ok": true,                      # = datagro.ok
       "data_referencia": "2026-10-17", # dia LOCAL do envio (gating do catch-up)
       "started_at": "...", "finished_at": "...",
-      "error": "cepea: ...; datagro: ...",   # só quando alguma fonte falhou
-      "cepea":   {"ok": true, "indicador": "CEPEA_BOI_GORDO", "data_indicador": ..., "valor_rs": ..., "inserted": 0, "updated": 1},
+      "error": "datagro: ...",         # só quando a fonte falhou
       "datagro": {"ok": true, "indicador": "DATAGRO_BOI_GORDO_SP", "datas": [...5], "valores_rs": [...5],
                   "data_indicador": ..., "valor_rs": ..., "inserted": 1, "updated": 4, "quadro": "ok"}
     }
 
-Política "uma fonte fora do ar não derruba a outra": as duas sempre tentam; o
-``ok`` global só fecha com as duas OK, então o catch-up (a cada 30 min) retenta
-enquanto faltar alguma. Para não refazer a que já deu certo, o catch-up reaproveita
-o bloco OK do MESMO dia (``reaproveitado: true``) e refaz só a que falhou; o
-disparo manual (``indicadores-once``) usa ``force=True`` e refaz as duas.
+O catch-up (a cada 30 min) retenta enquanto o bloco ``datagro`` de hoje não
+estiver OK. Se ele já deu certo no MESMO dia, o bloco é reaproveitado
+(``reaproveitado: true``) em vez de refeito; o disparo manual
+(``indicadores-once``) usa ``force=True`` e refaz.
 
-Fonte desligada por config (``indicadores_datagro_enabled = false``) entra como
-``{"ok": true, "skipped": "desligado"}`` e não pesa no ``ok`` global.
+Status gravado por versão anterior do serviço pode trazer blocos de fontes que
+saíram do job (ver CHANGELOG): são ignorados na leitura — só o bloco
+``datagro`` decide se o dia está feito — e somem na próxima gravação.
+
+Idempotência — cenário NORMAL, não exceção: cada fazenda roda seu próprio
+syncronizer, então N instâncias coletam e enviam o MESMO indicador do dia. A
+API faz upsert por (indicador, data) e responder ``updated`` (re-envio) é
+SUCESSO normal — não é erro nem warning. O "no máximo 1 sucesso/dia" é por
+instância local (gating do catch-up no scheduler); o payload não carrega NADA
+específico da fazenda (o indicador é nacional; o token já identifica quem enviou).
 
 :func:`run_indicadores` NUNCA levanta. Um :class:`threading.Lock` module-level
 serializa cron + catch-up + disparo manual (um envio por vez).
@@ -35,9 +40,9 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from .. import timewin
-from . import cepea, datagro
+from . import datagro
 
-FONTES = ("cepea", "datagro")
+FONTE = "datagro"
 
 # Serializa cron + catch-up + disparo manual: um envio por vez.
 _LOCK = threading.Lock()
@@ -58,27 +63,29 @@ def read_status(paths) -> Optional[dict]:
         return None
 
 
-def indicadores_done_today(paths, settings) -> bool:
-    """True se o envio de HOJE (dia LOCAL) já concluiu OK — em CADA fonte.
+def _bloco_ok_do_dia(st: Optional[dict], data_ref: str) -> Optional[dict]:
+    """Bloco ``datagro`` já OK no dia ``data_ref`` (ou None).
 
-    Base do catch-up: no máximo 1 sucesso/dia por instância. Uma fonte ainda
-    pendente (sem bloco OK hoje) faz o catch-up voltar a rodar — só a pendente,
-    porque :func:`run_indicadores` reaproveita a que já deu certo.
-
-    Olha os BLOCOS por fonte, não o ``ok`` do topo: um status gravado por uma
-    versão anterior do serviço (só CEPEA, sem o bloco ``datagro``) não conta
-    como "feito" — é assim que uma fonte nova entra nas máquinas já instaladas
-    no mesmo dia do self-update, sem esperar o cron do dia seguinte. Fonte
-    desligada por config grava ``ok=True`` + ``skipped`` e conta como feita.
+    Olha o BLOCO, não o ``ok`` do topo: num status antigo o topo pode estar
+    ``false`` só por causa de uma fonte que saiu do job, e um status sem o bloco
+    ``datagro`` (versão bem antiga) não conta como feito. Bloco ``skipped`` (fonte
+    desligada por uma config que não existe mais) também não conta: a coleta
+    volta no mesmo dia em que o serviço atualiza.
     """
-    st = read_status(paths)
-    if not st or st.get("data_referencia") != timewin.local_today(settings):
-        return False
-    for fonte in FONTES:
-        bloco = st.get(fonte)
-        if not (isinstance(bloco, dict) and bloco.get("ok")):
-            return False
-    return True
+    if not isinstance(st, dict) or st.get("data_referencia") != data_ref:
+        return None
+    bloco = st.get(FONTE)
+    if isinstance(bloco, dict) and bloco.get("ok") and not bloco.get("skipped"):
+        return bloco
+    return None
+
+
+def indicadores_done_today(paths, settings) -> bool:
+    """True se o envio de HOJE (dia LOCAL) do DATAGRO já concluiu OK.
+
+    Base do catch-up: no máximo 1 sucesso/dia por instância.
+    """
+    return _bloco_ok_do_dia(read_status(paths), timewin.local_today(settings)) is not None
 
 
 def _write_status(paths, status: dict, log) -> None:
@@ -93,21 +100,11 @@ def _write_status(paths, status: dict, log) -> None:
         log.warning("indicadores: não consegui gravar last_indicadores.json: %s", exc)
 
 
-def _bloco_anterior_ok(anterior: Optional[dict], fonte: str, data_ref: str) -> Optional[dict]:
-    """Bloco da fonte já OK no MESMO dia (para o catch-up não refazer)."""
-    if not anterior or anterior.get("data_referencia") != data_ref:
-        return None
-    bloco = anterior.get(fonte)
-    if isinstance(bloco, dict) and bloco.get("ok") and not bloco.get("skipped"):
-        return bloco
-    return None
-
-
 def run_indicadores(settings, paths, http, log, force: bool = False) -> dict:
-    """Roda CEPEA e DATAGRO, cada um isolado, e grava um status só. NUNCA levanta.
+    """Roda o DATAGRO e grava o status. NUNCA levanta.
 
-    ``force=True`` (disparo manual) refaz as duas fontes mesmo que já tenham dado
-    certo hoje; sem ``force`` (cron/catch-up) a fonte OK do dia é reaproveitada.
+    ``force=True`` (disparo manual) refaz a coleta mesmo que já tenha dado certo
+    hoje; sem ``force`` (cron/catch-up) o bloco OK do dia é reaproveitado.
     """
     if not _LOCK.acquire(blocking=False):
         log.warning("indicadores: já há um envio em andamento; ignorando este disparo")
@@ -116,34 +113,24 @@ def run_indicadores(settings, paths, http, log, force: bool = False) -> dict:
     data_ref = timewin.local_today(settings)
     status: dict = {"ok": False, "data_referencia": data_ref, "started_at": _now_iso()}
     try:
-        anterior = None if force else read_status(paths)
-        hoje = timewin.local_now(settings).date()
-
-        for fonte in FONTES:
-            reuso = _bloco_anterior_ok(anterior, fonte, data_ref)
-            if reuso is not None:
-                log.info("indicadores: %s já concluído hoje; reaproveitando", fonte.upper())
-                status[fonte] = dict(reuso, reaproveitado=True)
-                continue
-            try:
-                if fonte == "cepea":
-                    status[fonte] = cepea.run_cepea(http, log)
-                elif not getattr(settings, "indicadores_datagro_enabled", True):
-                    log.info("indicadores: DATAGRO desligado por config; pulando")
-                    status[fonte] = {"ok": True, "skipped": "desligado", "indicador": datagro.INDICADOR}
-                else:
-                    status[fonte] = datagro.run_datagro(http, log, hoje=hoje)
-            except Exception as exc:  # noqa: BLE001 - run_* não levanta, mas por garantia
-                status[fonte] = {"ok": False, "error": str(exc)}
-                log.error("indicadores: %s FALHOU fora do ciclo: %s", fonte.upper(), exc)
-
-        erros = [f"{f}: {status[f].get('error')}" for f in FONTES if not status[f].get("ok")]
-        status["ok"] = not erros
-        if erros:
-            status["error"] = "; ".join(erros)
-            log.error("indicadores: job com falha (data=%s): %s", data_ref, status["error"])
+        reuso = None if force else _bloco_ok_do_dia(read_status(paths), data_ref)
+        if reuso is not None:
+            log.info("indicadores: DATAGRO já concluído hoje; reaproveitando")
+            status[FONTE] = dict(reuso, reaproveitado=True)
         else:
-            log.info("indicadores: job concluído (data=%s): CEPEA e DATAGRO OK", data_ref)
+            try:
+                hoje = timewin.local_now(settings).date()
+                status[FONTE] = datagro.run_datagro(http, log, hoje=hoje)
+            except Exception as exc:  # noqa: BLE001 - run_datagro não levanta, mas por garantia
+                status[FONTE] = {"ok": False, "error": str(exc)}
+                log.error("indicadores: DATAGRO FALHOU fora do ciclo: %s", exc)
+
+        status["ok"] = bool(status[FONTE].get("ok"))
+        if status["ok"]:
+            log.info("indicadores: job concluído (data=%s): DATAGRO OK", data_ref)
+        else:
+            status["error"] = f"{FONTE}: {status[FONTE].get('error')}"
+            log.error("indicadores: job com falha (data=%s): %s", data_ref, status["error"])
     except Exception as exc:  # noqa: BLE001 - nunca levanta; grava status e segue
         status.update({"ok": False, "error": str(exc)})
         log.error("indicadores: FALHOU (data=%s): %s", data_ref, exc)

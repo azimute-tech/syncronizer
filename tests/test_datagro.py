@@ -14,8 +14,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from syncronizer.indicadores import cepea, datagro, job
-from syncronizer.indicadores.cepea import IndicadoresError
+from syncronizer.indicadores import datagro, job
+from syncronizer.indicadores.comum import IndicadoresError
 
 log = logging.getLogger("test.datagro")
 
@@ -339,7 +339,7 @@ def test_run_datagro_api_200_com_errors_e_falha(monkeypatch):
     _patch_fontes(monkeypatch)
     http = _Http(post_resp={"inserted": 0, "updated": 0, "avisos": [], "errors": [
         {"index": i, "chave": "DATAGRO_BOI_GORDO_SP",
-         "message": 'INDICADOR "DATAGRO_BOI_GORDO_SP" fora do dominio (CEPEA_BOI_GORDO)'}
+         "message": 'INDICADOR "DATAGRO_BOI_GORDO_SP" fora do dominio'}
         for i in range(5)]})
     bloco = datagro.run_datagro(http, log, hoje=HOJE)
     assert bloco["ok"] is False
@@ -367,7 +367,7 @@ def test_run_datagro_post_falha_nao_levanta(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# orquestrador (job): uma fonte fora do ar não derruba a outra
+# orquestrador (job) com o coletor de verdade (fontes mockadas por URL)
 # --------------------------------------------------------------------------- #
 def _settings(**over):
     base = dict(api_base_url="https://api.example.com", api_key="k", api_token="",
@@ -383,95 +383,71 @@ def _paths(tmp_path):
     return SimpleNamespace(indicadores_dir=d)
 
 
-def _patch_cepea_ok(monkeypatch):
-    monkeypatch.setattr(cepea, "run_cepea", lambda http, log: {
-        "ok": True, "indicador": "CEPEA_BOI_GORDO", "data_indicador": "2026-10-16",
-        "valor_rs": 348.55, "inserted": 0, "updated": 1})
-
-
-def test_job_cepea_fora_do_ar_nao_derruba_datagro(tmp_path, monkeypatch):
-    _patch_fontes(monkeypatch)
-    monkeypatch.setattr(cepea, "run_cepea", lambda http, log: {
-        "ok": False, "indicador": "CEPEA_BOI_GORDO", "error": "widget CEPEA respondeu status 403"})
+def _fixar_dia(monkeypatch, hora=21):
+    from datetime import datetime
     monkeypatch.setattr(job.timewin, "local_today", lambda s, now_utc=None: "2026-10-17")
-    monkeypatch.setattr(job.timewin, "local_now", lambda s, now_utc=None: __import__("datetime").datetime(2026, 10, 17, 20, 30))
+    monkeypatch.setattr(job.timewin, "local_now", lambda s, now_utc=None: datetime(2026, 10, 17, hora, 0))
+
+
+def test_job_envia_datagro_e_grava_status(tmp_path, monkeypatch):
+    _patch_fontes(monkeypatch)
+    _fixar_dia(monkeypatch, hora=20)
     http = _Http()
     paths = _paths(tmp_path)
     s = _settings()
 
     status = job.run_indicadores(s, paths, http, log)
 
-    assert status["ok"] is False                       # job só fecha com as duas
-    assert status["cepea"]["ok"] is False
-    assert status["datagro"]["ok"] is True             # DATAGRO foi enviado mesmo assim
-    assert status["datagro"]["datas"][-1] == "2026-10-16"
-    assert "cepea: widget CEPEA respondeu status 403" in status["error"]
-    assert len(http.calls) == 1 and http.calls[0][2]["indicadores"][0]["INDICADOR"] == "DATAGRO_BOI_GORDO_SP"
-    assert job.indicadores_done_today(paths, s) is False   # catch-up vai retentar
+    assert status["ok"] is True
+    assert status["datagro"]["datas"][-1] == "2026-10-16"   # hoje do job = dia LOCAL
+    assert len(http.calls) == 1
+    assert {i["INDICADOR"] for i in http.calls[0][2]["indicadores"]} == {"DATAGRO_BOI_GORDO_SP"}
     saved = json.loads((paths.indicadores_dir / "last_indicadores.json").read_text())
-    assert saved["datagro"]["ok"] is True and saved["cepea"]["ok"] is False
+    assert saved["ok"] is True and saved["datagro"]["ok"] is True
+    assert job.indicadores_done_today(paths, s) is True
 
 
-def test_job_catchup_reaproveita_fonte_ok_e_refaz_so_a_pendente(tmp_path, monkeypatch):
+def test_job_api_rejeita_e_catchup_retenta(tmp_path, monkeypatch):
     _patch_fontes(monkeypatch)
-    monkeypatch.setattr(job.timewin, "local_today", lambda s, now_utc=None: "2026-10-17")
-    monkeypatch.setattr(job.timewin, "local_now", lambda s, now_utc=None: __import__("datetime").datetime(2026, 10, 17, 21, 0))
+    _fixar_dia(monkeypatch)
+    paths = _paths(tmp_path)
+    s = _settings()
+    http = _Http(post_resp={"inserted": 0, "updated": 0, "errors": [
+        {"index": 0, "chave": "DATAGRO_BOI_GORDO_SP", "message": "fora do dominio"}]})
+    status = job.run_indicadores(s, paths, http, log)
+    assert status["ok"] is False and status["error"].startswith("datagro: API rejeitou 1 de 5")
+    assert job.indicadores_done_today(paths, s) is False
+
+
+def test_job_catchup_reaproveita_datagro_ok_do_dia(tmp_path, monkeypatch):
+    _patch_fontes(monkeypatch)
+    _fixar_dia(monkeypatch)
     paths = _paths(tmp_path)
     s = _settings()
     (paths.indicadores_dir / "last_indicadores.json").write_text(json.dumps({
-        "ok": False, "data_referencia": "2026-10-17",
-        "cepea": {"ok": False, "error": "403"},
+        "ok": True, "data_referencia": "2026-10-17",
         "datagro": {"ok": True, "indicador": "DATAGRO_BOI_GORDO_SP", "datas": ["2026-10-16"],
                     "valores_rs": [380.42], "data_indicador": "2026-10-16", "valor_rs": 380.42},
     }))
-    _patch_cepea_ok(monkeypatch)
     http = _Http()
 
     status = job.run_indicadores(s, paths, http, log)
 
     assert status["ok"] is True
     assert status["datagro"]["reaproveitado"] is True
-    assert http.calls == []                            # DATAGRO não foi refeito (CEPEA é mock)
+    assert http.calls == []                            # DATAGRO não foi refeito
     assert job.indicadores_done_today(paths, s) is True
 
 
-def test_job_force_refaz_as_duas_fontes(tmp_path, monkeypatch):
+def test_job_force_refaz_datagro(tmp_path, monkeypatch):
     _patch_fontes(monkeypatch)
-    monkeypatch.setattr(job.timewin, "local_today", lambda s, now_utc=None: "2026-10-17")
-    monkeypatch.setattr(job.timewin, "local_now", lambda s, now_utc=None: __import__("datetime").datetime(2026, 10, 17, 21, 0))
+    _fixar_dia(monkeypatch)
     paths = _paths(tmp_path)
     (paths.indicadores_dir / "last_indicadores.json").write_text(json.dumps({
-        "ok": True, "data_referencia": "2026-10-17",
-        "cepea": {"ok": True}, "datagro": {"ok": True},
+        "ok": True, "data_referencia": "2026-10-17", "datagro": {"ok": True},
     }))
-    _patch_cepea_ok(monkeypatch)
     http = _Http()
     status = job.run_indicadores(_settings(), paths, http, log, force=True)
     assert status["ok"] is True
     assert "reaproveitado" not in status["datagro"]
     assert len(http.calls) == 1                        # DATAGRO refeito de verdade
-
-
-def test_job_datagro_desligado_por_config(tmp_path, monkeypatch):
-    chamadas = _patch_fontes(monkeypatch)
-    monkeypatch.setattr(job.timewin, "local_today", lambda s, now_utc=None: "2026-10-17")
-    monkeypatch.setattr(job.timewin, "local_now", lambda s, now_utc=None: __import__("datetime").datetime(2026, 10, 17, 21, 0))
-    _patch_cepea_ok(monkeypatch)
-    paths = _paths(tmp_path)
-    s = _settings(indicadores_datagro_enabled=False)
-    status = job.run_indicadores(s, paths, _Http(), log)
-    assert status["ok"] is True
-    assert status["datagro"] == {"ok": True, "skipped": "desligado", "indicador": "DATAGRO_BOI_GORDO_SP"}
-    assert chamadas == []                              # nem tocou na DATAGRO
-    assert job.indicadores_done_today(paths, s) is True
-
-
-def test_config_datagro_enabled_default_e_secao(tmp_path, monkeypatch):
-    monkeypatch.setenv("SYNCRONIZER_DATA_DIR", str(tmp_path))
-    from syncronizer.config import load_settings
-    assert load_settings().indicadores_datagro_enabled is True
-    cfgdir = tmp_path / "config"
-    cfgdir.mkdir()
-    (cfgdir / "config.toml").write_text("[indicadores]\nenabled = true\ndatagro_enabled = false\n",
-                                        encoding="utf-8")
-    assert load_settings().indicadores_datagro_enabled is False
