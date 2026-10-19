@@ -73,7 +73,7 @@ def test_env_still_fills_fields_absent_from_config(tmp_path, monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# migração de esquema (config_version) — CEPEA ligado por padrão
+# migração de esquema (config_version) — indicadores ligados por padrão
 # --------------------------------------------------------------------------- #
 def _load(tmp_path, monkeypatch):
     monkeypatch.setenv("SYNCRONIZER_DATA_DIR", str(tmp_path))
@@ -194,3 +194,12 @@ def test_example_config_is_current_version_and_enabled():
 def test_indicadores_fields_exposed_in_panel():
     keys = {f[0] for f in configio.FIELDS}
     assert {"indicadores_enabled", "indicadores_hour", "indicadores_minute"} <= keys
+    # com o DATAGRO como fonte única, `enabled` liga/desliga o job todo
+    assert "indicadores_datagro_enabled" not in keys
+
+
+def test_example_config_sem_datagro_enabled():
+    tomllib = configio.tomllib
+    from pathlib import Path
+    ex = Path(__file__).resolve().parents[1] / "config.toml.example"
+    assert "datagro_enabled" not in tomllib.loads(ex.read_text(encoding="utf-8"))["indicadores"]

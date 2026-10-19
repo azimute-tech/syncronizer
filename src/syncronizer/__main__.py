@@ -4,7 +4,7 @@ service (`<venv>\\python.exe -m syncronizer run`).
 Subcommands:
   run              start the always-on scheduler (ETL + self-update jobs)
   run-once         execute a single ETL+SEND cycle and exit (first-install validation)
-  indicadores-once collect the CEPEA + DATAGRO boi gordo indicators and POST them to the API once
+  indicadores-once collect the DATAGRO boi gordo indicator and POST it to the API once
   self-check    import endpoints, open the control DB (+ optionally Firebird)
   print-config  print resolved settings + paths as JSON (secrets redacted)
   install-help  print the NSSM service registration commands
@@ -151,10 +151,10 @@ def cmd_run_once(_args) -> int:
 
 
 def cmd_indicadores_once(_args) -> int:
-    # Ciclo avulso dos indicadores (CEPEA + DATAGRO) para validação de staging/
-    # primeira instalação. Não abre control.db nem Firebird — só HTTP (fontes + API).
-    # force=True: refaz as duas fontes mesmo que já tenham concluído hoje.
-    # Exit code 1 se QUALQUER fonte falhou, para o chamador detectar.
+    # Ciclo avulso dos indicadores (DATAGRO) para validação de staging/
+    # primeira instalação. Não abre control.db nem Firebird — só HTTP (fonte + API).
+    # force=True: refaz a coleta mesmo que já tenha concluído hoje.
+    # Exit code 1 se a coleta/envio falhou, para o chamador detectar.
     from .config import load_settings
     from .http.client import HttpClient
     from .indicadores import run_indicadores
@@ -244,7 +244,7 @@ def main(argv=None) -> int:
     sub.add_parser("run-once", help="run a single cycle and exit").set_defaults(func=cmd_run_once)
     sub.add_parser(
         "indicadores-once",
-        help="raspa o indicador CEPEA boi gordo e envia à API (um ciclo)",
+        help="coleta o indicador DATAGRO boi gordo SP e envia à API (um ciclo)",
     ).set_defaults(func=cmd_indicadores_once)
 
     sc = sub.add_parser("self-check", help="validate endpoints + DBs")
