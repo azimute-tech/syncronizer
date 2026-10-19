@@ -100,9 +100,8 @@ def run_service(app, log) -> None:
     def indicadores_catchup_job():
         # Recupera o envio do dia se as 20:30 falharam (ex.: internet da fazenda fora).
         # Só dispara depois do horário agendado e só se o envio de hoje ainda não foi
-        # OK nas DUAS fontes (CEPEA + DATAGRO) — no máximo 1 sucesso/dia por instância
+        # OK no DATAGRO — no máximo 1 sucesso/dia por instância
         # (re-envio de outra fazenda é normal: a API faz upsert por indicador+data).
-        # A fonte que já deu certo hoje é reaproveitada; só a pendente é refeita.
         # Após a meia-noite local vira outro dia e para sozinho até o cron do próximo dia.
         try:
             from .indicadores import indicadores_done_today

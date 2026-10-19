@@ -46,8 +46,7 @@ FIELDS = [
     ("backup_compression", "Compressão (gzip / xz)", "text", "Backup", False, False),
     ("backup_temp_dir", "Diretório temporário (vazio = padrão)", "text", "Backup", True, False),
     ("backup_max_retries", "Tentativas de upload", "int", "Backup", False, False),
-    ("indicadores_enabled", "Envio noturno dos indicadores (CEPEA + DATAGRO) habilitado", "bool", "Indicadores", False, False),
-    ("indicadores_datagro_enabled", "Fonte DATAGRO (Indicador do Boi SP) habilitada", "bool", "Indicadores", False, False),
+    ("indicadores_enabled", "Envio noturno dos indicadores (DATAGRO) habilitado", "bool", "Indicadores", False, False),
     ("indicadores_hour", "Hora do envio (horário local; ex.: 20)", "int", "Indicadores", False, False),
     ("indicadores_minute", "Minuto do envio (horário local)", "int", "Indicadores", False, False),
 ]
@@ -55,7 +54,7 @@ FIELDS = [
 # Versão do esquema do config.toml. Permite migrar, UMA vez, valores que eram só o
 # default antigo gravado no arquivo (o painel grava TODOS os campos do formulário ao
 # salvar, então um default vira valor "explícito" no disco sem ninguém ter escolhido).
-#   1 (ou ausente) -> 2: CEPEA (`indicadores_enabled`) passa a nascer ligado. Antes da
+#   1 (ou ausente) -> 2: indicadores (`indicadores_enabled`) passam a nascer ligados. Antes da
 #   v2 o campo não existia no painel; um `false` no arquivo só podia vir do
 #   config.toml.example antigo (default desligado), nunca de uma escolha pela UI.
 CONFIG_VERSION = 2
@@ -185,7 +184,7 @@ def migrate_config(path: Path) -> list:
                 hit = _GROUPED_ENABLED_OFF.match(body)
             if hit:
                 body = f"{hit.group(1)}true{hit.group(2)}"
-                changes.append("indicadores_enabled: false -> true (default antigo; CEPEA agora ligado)")
+                changes.append("indicadores_enabled: false -> true (default antigo; indicadores (DATAGRO) agora ligados)")
         out.append(body + eol)
 
     # chave de topo precisa vir antes da primeira tabela: entra logo após o

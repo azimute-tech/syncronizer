@@ -29,7 +29,7 @@ nenhuma pode ser depois de hoje. Se o ``boi.svg`` trouxer a mesma data (dia e
 mês) com ano DIFERENTE do inferido, a inferência está errada e o job falha
 fechado — melhor noite sem dado do que dado na data errada.
 
-Validação anti-lixo, como no CEPEA: cada valor entre R$ 100 e R$ 1000/@, e a
+Validação anti-lixo (:mod:`.comum`): cada valor entre R$ 100 e R$ 1000/@, e a
 "Média 5 dias" do SVG tem que bater com a média dos 5 valores lidos (tolerância
 0,05): é o que garante que pegamos a LINHA de SP e não a do estado seguinte.
 Qualquer desvio é "formato mudou": :class:`IndicadoresError`, nada é enviado.
@@ -46,7 +46,7 @@ from typing import Optional
 
 import requests
 
-from .cepea import VALOR_MAX_RS, VALOR_MIN_RS, IndicadoresError, _parse_valor_brl, conferir_resposta
+from .comum import VALOR_MAX_RS, VALOR_MIN_RS, IndicadoresError, conferir_resposta, parse_valor_brl
 
 BOLETIM_URL = "https://pec.datagro.com/pec/mapas/boletim_cinco.svg"
 BOI_URL = "https://pec.datagro.com/pec/mapas/boi.svg"
@@ -121,7 +121,7 @@ def _valor(texto: str, contexto: str) -> float:
         raise IndicadoresError(
             f"boletim DATAGRO: esperava valor R$ em {contexto}, veio {texto!r} (formato mudou?)"
         )
-    valor = _parse_valor_brl(texto)
+    valor = parse_valor_brl(texto)
     if not (VALOR_MIN_RS <= valor <= VALOR_MAX_RS):
         raise IndicadoresError(
             f"boletim DATAGRO: valor R$ {valor:.2f}/@ ({contexto}) fora da faixa plausível "
@@ -249,7 +249,7 @@ def send_datagro(http, itens: list) -> dict:
 
     A API faz upsert por (INDICADOR, DATA): os 4 dias anteriores já existem na
     maioria das noites e voltam como ``updated`` — sucesso normal. Item recusado
-    vem em ``errors`` com status 200 — :func:`cepea.conferir_resposta` trata.
+    vem em ``errors`` com status 200 — :func:`comum.conferir_resposta` trata.
     """
     payload = {
         "indicadores": [

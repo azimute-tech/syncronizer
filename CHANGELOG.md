@@ -24,5 +24,22 @@
   depois no início/fim dos próximos ciclos); pendentes se fundem num só. 404 (API sem a
   rota) desliga o aviso até reiniciar; outro 4xx descarta com WARNING.
 
+### Removido
+- Indicador do Boi Gordo CEPEA/B3 (`CEPEA_BOI_GORDO`): o job noturno de indicadores
+  deixa de coletar e enviar o CEPEA (decisão de 18/10/2026: só DATAGRO e as travas). O
+  scraper do widget sai; os helpers que o DATAGRO usa (faixa anti-lixo, parse de R$,
+  conferência da resposta da API) passam para `indicadores/comum.py`, sem mudança de
+  comportamento. A API do AgroDB passa a rejeitar `CEPEA_BOI_GORDO` como item
+  descontinuado: instalação ainda na versão antiga do serviço vai logar falha do CEPEA
+  (e o catch-up dela retenta a cada 30 min) até o self-update; o DATAGRO segue entrando.
+- `[indicadores] datagro_enabled`: com uma fonte só, duplicava `[indicadores] enabled`,
+  que passa a ligar/desligar o job todo; o campo sai do painel. config.toml antigo que
+  ainda tenha a chave carrega normalmente (ela é ignorada).
+- Bloco `cepea` do `last_indicadores.json`: o status passa a ter só o bloco `datagro`, e
+  `ok` global = `datagro.ok`. Status antigo com bloco `cepea` é ignorado (só o `datagro`
+  decide se o dia está feito, então um `cepea` com falha não deixa o catch-up rodando) e
+  some na próxima gravação. Bloco `datagro` com `skipped` (desligado pela chave removida)
+  não conta como feito: a coleta volta no mesmo dia do self-update.
+
 ### Documentado
 - Mudar o intervalo do ciclo (ex.: 15 min) é só `cycle_minutes` + reiniciar pelo painel.
