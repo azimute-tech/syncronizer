@@ -3,6 +3,12 @@
 ## [Não lançado]
 
 ### Adicionado
+- Ciclo logo após código novo, mesmo fora da janela (`posupdate.py`): o commit em
+  execução que ainda não completou um ciclo roda o ETL já no boot (mesmo com
+  `run_on_start` desligado) e fora da janela, até um ciclo completo (Firebird lido, sem
+  erro de endpoint e sem envio falho), que grava `state/last_cycle_commit`. Vale para
+  self-update, update manual e instalação nova. Teto de 6 ciclos fora da janela por
+  commit; estourado, o backlog escoa no próximo ciclo dentro da janela.
 - Estoque de insumos (Relatório de Insumos do AgroDB): feeds `insumos_entradas`
   (cargas recebidas, `DET_ITENS_NFINSUMOS` x `CAD_NFINSUMOS` + fornecedor, order 57 ->
   `POST /api/integracoes/tgc/insumos-entradas`) e `insumos_baixas` (baixas avulsas,
