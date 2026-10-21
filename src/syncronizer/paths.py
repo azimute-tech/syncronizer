@@ -54,8 +54,6 @@ class Paths:
     last_good_commit: Path
     boot_attempts: Path
     quarantine: Path
-    # commit que completou o último ciclo (pós-update fora da janela, posupdate.py)
-    last_cycle_commit: Path
     # code/runtime locations (installer-written; derived defaults otherwise)
     repo_dir: Path
     venv_dir: Path
@@ -110,7 +108,6 @@ def build_paths(settings, data_dir: Path | None = None) -> Paths:
         last_good_commit=state_dir / "last_good_commit",
         boot_attempts=state_dir / "boot_attempts",
         quarantine=state_dir / "quarantine.json",
-        last_cycle_commit=state_dir / "last_cycle_commit",
         repo_dir=_override("repo_dir", "SYNCRONIZER_REPO_DIR", data_dir / "repo"),
         venv_dir=_override("venv_dir", "SYNCRONIZER_VENV_DIR", data_dir / "venv"),
         git_exe=_override("git_exe", "SYNCRONIZER_GIT_EXE", git_default),
