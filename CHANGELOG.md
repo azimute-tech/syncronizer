@@ -3,6 +3,20 @@
 ## [Não lançado]
 
 ### Adicionado
+- Ciclo logo após código novo, mesmo fora da janela (`posupdate.py`): o commit em
+  execução que ainda não completou um ciclo roda o ETL já no boot (mesmo com
+  `run_on_start` desligado) e fora da janela, até um ciclo completo (Firebird lido, sem
+  erro de endpoint e sem envio falho), que grava `state/last_cycle_commit`. Vale para
+  self-update, update manual e instalação nova. Teto de 6 ciclos fora da janela por
+  commit; estourado, o backlog escoa no próximo ciclo dentro da janela.
+- Estoque de insumos (Relatório de Insumos do AgroDB): feeds `insumos_entradas`
+  (cargas recebidas, `DET_ITENS_NFINSUMOS` x `CAD_NFINSUMOS` + fornecedor, order 57 ->
+  `POST /api/integracoes/tgc/insumos-entradas`) e `insumos_baixas` (baixas avulsas,
+  `CAD_BAIXA_ALIM` + centro de custo, order 58 -> `POST /api/integracoes/tgc/insumos-baixas`),
+  ambos full scan + row_hash. O feed `alimentos` ganha `CONTROLA_ESTOQUE`,
+  `ESTOQUE_MINIMO_KG`, `ESTOQUE_MINIMO_DIAS`, `MS_PCT`, `UNIDADE` e `DATA_ULT_CUSTO` — o
+  primeiro ciclo re-envia o catálogo inteiro uma vez. Deploy: AgroDB primeiro (migration
+  074 + rotas); com a API antiga as rotas novas dão 404 no ciclo.
 - Indicador do Boi DATAGRO praça SP (`DATAGRO_BOI_GORDO_SP`) no job noturno de
   indicadores, ao lado do CEPEA: lê os 5 últimos dias úteis de SP do
   `pec.datagro.com/pec/mapas/boletim_cinco.svg` (fonte oficial, gravada em `FONTE`),
