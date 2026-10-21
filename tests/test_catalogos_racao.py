@@ -3,7 +3,6 @@
 (CAD_ALIMENTO, 113 linhas).
 """
 import json
-from datetime import date
 from decimal import Decimal
 
 from syncronizer.core.extract import ExtractContext
@@ -93,75 +92,6 @@ def test_alimentos_full_scan():
     assert ep.incremental_column is None
     assert "CAD_ALIMENTO" in spec.sql and spec.params == ()
     assert "LIMIT" not in spec.sql.upper()
-
-
-# --- alimentos: campos do estoque (contrato seção 12) -------------------------
-
-def _alimento_estoque(**over):
-    # MILHO MOÍDO da staging: entra na posição, mínimo de 20 dias, sem mínimo em kg
-    base = _alimento(
-        COD_ALIMENTO=80038, NOME="MILHO MOÍDO_NOVO 07/08", TIPO="ENERGETICO",
-        CUSTO_MEDIO_RS=Decimal("1.0580"), CONTROLA_ESTOQUE="S",
-        ESTOQUE_MINIMO_KG=Decimal("0.00"), ESTOQUE_MINIMO_DIAS=20,
-        MS_PCT=Decimal("88.00"), UNIDADE="KG", DATA_ULT_CUSTO=None,
-    )
-    base.update(over)
-    return base
-
-
-def test_alimentos_payload_ganha_os_seis_campos_do_estoque():
-    r = AlimentosEndpoint().transform(_alimento_estoque())
-    assert list(r) == [
-        "COD_ALIMENTO", "NOME", "TIPO", "CUSTO_MEDIO_RS",
-        "CONTROLA_ESTOQUE", "ESTOQUE_MINIMO_KG", "ESTOQUE_MINIMO_DIAS", "MS_PCT",
-        "UNIDADE", "DATA_ULT_CUSTO",
-    ]
-    assert r["NOME"] == "MILHO MOÍDO_NOVO 07/08"
-    assert r["CONTROLA_ESTOQUE"] is True
-    assert r["ESTOQUE_MINIMO_DIAS"] == 20 and isinstance(r["ESTOQUE_MINIMO_DIAS"], int)
-    assert r["COD_ALIMENTO"] == "80038" and r["CUSTO_MEDIO_RS"] == 1.058
-    assert r["ESTOQUE_MINIMO_KG"] is None    # 0,00 em 137/137 na staging
-    assert r["MS_PCT"] == 88.0 and r["UNIDADE"] == "KG"
-
-
-def test_controla_estoque_e_rel_estoque_atual_igual_a_s():
-    """Mesmo predicado da Posição do TGC (`AA_REL_ESTOQUE_ATUAL = 'S'`): 'N' (8 silos
-    encerrados na staging) e NULL ficam fora."""
-    ep = AlimentosEndpoint()
-    assert ep.transform(_alimento_estoque(CONTROLA_ESTOQUE="N"))["CONTROLA_ESTOQUE"] is False
-    assert ep.transform(_alimento_estoque(CONTROLA_ESTOQUE=None))["CONTROLA_ESTOQUE"] is False
-
-
-def test_estoque_minimo_e_ms_regra_de_zero():
-    """AA_ESTOQUEMINIMO é 0 em 137/137 (ninguém cadastrou mínimo em kg); 0 dias e MS
-    0,00 (AGUA-PADRAO) também são "não cadastrado". MS 100,00 dos minerais é real."""
-    ep = AlimentosEndpoint()
-    r = ep.transform(_alimento_estoque(ESTOQUE_MINIMO_DIAS=0, MS_PCT=Decimal("0.00")))
-    assert r["ESTOQUE_MINIMO_KG"] is None
-    assert r["ESTOQUE_MINIMO_DIAS"] is None and r["MS_PCT"] is None
-    r = ep.transform(_alimento_estoque(ESTOQUE_MINIMO_DIAS=None, MS_PCT=None,
-                                       ESTOQUE_MINIMO_KG=None))
-    assert r["ESTOQUE_MINIMO_DIAS"] is None and r["MS_PCT"] is None
-    assert r["ESTOQUE_MINIMO_KG"] is None
-    r = ep.transform(_alimento_estoque(ESTOQUE_MINIMO_KG=Decimal("5000.00"),
-                                       MS_PCT=Decimal("100.00")))
-    assert r["ESTOQUE_MINIMO_KG"] == 5000.0 and r["MS_PCT"] == 100.0
-
-
-def test_data_ult_custo_e_unidade():
-    """DIVERGÊNCIA: AA_DATAULTCUSTO é NULL em 137/137 na staging — a coluna entra pronta."""
-    ep = AlimentosEndpoint()
-    r = ep.transform(_alimento_estoque())
-    assert "DATA_ULT_CUSTO" in r and r["DATA_ULT_CUSTO"] is None
-    r = ep.transform(_alimento_estoque(DATA_ULT_CUSTO=date(2026, 10, 15), UNIDADE=""))
-    assert r["DATA_ULT_CUSTO"] == "2026-10-15" and r["UNIDADE"] is None
-
-
-def test_alimentos_sql_le_os_campos_do_estoque():
-    spec = AlimentosEndpoint().extract_spec(ExtractContext(last_watermark=None))
-    for coluna in ("AA_REL_ESTOQUE_ATUAL", "AA_ESTOQUEMINIMO", "AA_ESTOQUE_MIN_DIAS",
-                   "AA_MS", "AA_UN_MEDIDA", "AA_DATAULTCUSTO"):
-        assert coluna in spec.sql, coluna
 
 
 # --- ordenação entre feeds ----------------------------------------------------

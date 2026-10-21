@@ -391,7 +391,7 @@ def _run_service(monkeypatch, **over):
     app = SimpleNamespace(
         settings=s, had_successful_cycle=False, restart_requested=False,
         run_cycle=lambda: None, close=lambda: None,
-        paths=SimpleNamespace(repo_dir="/nao-existe"), http=None,
+        paths=SimpleNamespace(), http=None,
     )
     try:
         scheduler.run_service(app, log)

@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.blocking import BlockingScheduler
 
-from . import bootgate, posupdate, timewin, updater
+from . import bootgate, timewin, updater
 from .web import server as webserver
 
 
@@ -33,12 +33,6 @@ def run_service(app, log) -> None:
     started = now
     grace = timedelta(minutes=s.boot_grace_minutes)
     health = {"marked": False}
-    # Código novo (self-update, update manual, instalação) ainda sem ciclo completo
-    # sincroniza já, mesmo fora da janela — ver posupdate.py.
-    pos = posupdate.PosUpdate.carregar(app.paths, log=log)
-    if pos.pendente:
-        log.info("código %s ainda sem ciclo completo: o próximo ciclo roda mesmo fora da janela",
-                 (pos.sha or "")[:8])
 
     def maybe_mark_healthy():
         # Enshrine the running commit as last-known-good only after a real cycle has
@@ -54,19 +48,11 @@ def run_service(app, log) -> None:
         # Janela rígida: fora de [start, end) local não há tráfego à API (nem leitura
         # do Firebird). O backlog fica durável no control.db e escoa no próximo ciclo
         # dentro da janela. Vale para o interval E para o startup job (ambos reusam isto).
-        # Exceção: código novo ainda sem ciclo completo (posupdate.py), com teto.
         if not timewin.within_window(s):
-            if not pos.forcar_fora_da_janela():
-                log.info("fora da janela de execução (%02d–%02d local); pulando ciclo",
-                         s.etl_window_start_hour, s.etl_window_end_hour)
-                return
-            log.info("fora da janela, mas o código %s ainda não completou um ciclo: "
-                     "sincronizando (tentativa %d/%d)", (pos.sha or "")[:8],
-                     pos.tentativas_fora, posupdate.MAX_CICLOS_FORA_DA_JANELA)
-        stats = app.run_cycle()
-        if pos.registrar(stats):
-            log.info("ciclo completo no código %s: sincronismo pós-atualização garantido",
-                     (pos.sha or "")[:8])
+            log.info("fora da janela de execução (%02d–%02d local); pulando ciclo",
+                     s.etl_window_start_hour, s.etl_window_end_hour)
+            return
+        app.run_cycle()
         maybe_mark_healthy()
         if app.restart_requested:
             log.info("restart requested; shutting down scheduler for relaunch")
@@ -156,8 +142,7 @@ def run_service(app, log) -> None:
                       id="indicadores_catchup_boot")
         log.info("indicadores agendado: %02d:%02d local (=%02d:%02d UTC); catch-up a cada 30min e 90s após o boot",
                  s.indicadores_hour, s.indicadores_minute, ih, im)
-    # Código novo pendente roda logo após o boot mesmo com run_on_start desligado.
-    if s.run_on_start or pos.pendente:
+    if s.run_on_start:
         sched.add_job(etl_job, "date", run_date=now + timedelta(seconds=1), id="startup")
 
     def _graceful(signum, _frame):
