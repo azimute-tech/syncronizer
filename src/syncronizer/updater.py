@@ -59,14 +59,6 @@ def write_marker(path: Path, value: str) -> None:
     os.replace(tmp, path)
 
 
-def read_marker(path: Path) -> str:
-    """Conteúdo de um marcador de estado, ou "" se ausente/ilegível."""
-    try:
-        return Path(path).read_text().strip()
-    except Exception:  # noqa: BLE001
-        return ""
-
-
 def read_quarantine(paths) -> set:
     try:
         if paths.quarantine.exists():
