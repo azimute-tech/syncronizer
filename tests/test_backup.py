@@ -496,7 +496,7 @@ def _run_service(monkeypatch, **over):
     app = SimpleNamespace(
         settings=s, had_successful_cycle=False, restart_requested=False,
         run_cycle=lambda: cycles.__setitem__("n", cycles["n"] + 1),
-        close=lambda: None, paths=SimpleNamespace(), http=None,
+        close=lambda: None, paths=SimpleNamespace(repo_dir="/nao-existe"), http=None,
     )
     try:
         scheduler.run_service(app, log)
@@ -510,6 +510,32 @@ def test_scheduler_adds_backup_jobs_only_when_enabled(monkeypatch):
     assert "backup" in on.jobs and "backup_catchup" in on.jobs
     off, _ = _run_service(monkeypatch, backup_enabled=False)
     assert "backup" not in off.jobs and "backup_catchup" not in off.jobs
+
+
+def test_scheduler_codigo_novo_sincroniza_fora_da_janela(monkeypatch, tmp_path):
+    # Código novo sem ciclo completo: roda já após o boot (mesmo com run_on_start
+    # desligado) e fora da janela, até um ciclo completo — depois volta a pular.
+    import syncronizer.scheduler as scheduler
+    from syncronizer import posupdate
+
+    paths = SimpleNamespace(last_cycle_commit=tmp_path / "state" / "last_cycle_commit")
+    monkeypatch.setattr(posupdate.PosUpdate, "carregar",
+                        classmethod(lambda cls, p, log=None: cls(paths, "abc123")))
+    monkeypatch.setattr(scheduler.timewin, "within_window", lambda s, now_utc=None: False)
+    sched, cycles = _run_service(monkeypatch, run_on_start=False)
+    assert "startup" in sched.jobs
+
+    etl = sched.funcs["etl"]
+    etl()  # o run_cycle falso devolve None: ciclo incompleto, segue pendente
+    assert cycles["n"] == 1
+    assert not paths.last_cycle_commit.exists()
+
+    paths.last_cycle_commit.parent.mkdir(parents=True)
+    paths.last_cycle_commit.write_text("abc123")  # como se um ciclo completasse
+    sched2, cycles2 = _run_service(monkeypatch, run_on_start=False)
+    assert "startup" not in sched2.jobs
+    sched2.funcs["etl"]()
+    assert cycles2["n"] == 0
 
 
 def test_scheduler_etl_job_respects_window(monkeypatch):
