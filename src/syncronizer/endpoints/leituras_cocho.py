@@ -49,7 +49,7 @@ class LeiturasCochoEndpoint(BatchEndpoint):
 
     payload_key = "leituras_cocho"
     record_key = "COD_LEITURA"
-    error_key = "cod_leitura"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

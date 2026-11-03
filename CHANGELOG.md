@@ -38,6 +38,16 @@
   depois no início/fim dos próximos ciclos); pendentes se fundem num só. 404 (API sem a
   rota) desliga o aviso até reiniciar; outro 4xx descarta com WARNING.
 
+### Corrigido
+- Item recusado pela API deixa de ser marcado como enviado. Toda rota TGC devolve o
+  identificador em `errors[].chave`, mas 18 dos 22 feeds procuravam `cod_*` ou `destino`:
+  o erro não casava com nenhuma linha e o item era dado como enviado, sem log. Agora ele
+  fica pendente, com a mensagem em `last_error`, e volta a cada ciclo até a API aceitar.
+  `tests/test_contrato_erros.py` cobre todos os feeds do registro com o corpo real da
+  resposta. Atenção: linha recusada antes desta versão segue marcada como enviada e só
+  volta se mudar na origem ou com "Limpar + re-sincronizar" do feed no painel local.
+- Backups do Firebird (`*.fbk`, `*.fbk.gz`, `*.fbk.xz`) entram no `.gitignore`.
+
 ### Removido
 - Indicador do Boi Gordo CEPEA/B3 (`CEPEA_BOI_GORDO`): o job noturno de indicadores
   deixa de coletar e enviar o CEPEA (decisão de 18/10/2026: só DATAGRO e as travas). O

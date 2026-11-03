@@ -72,7 +72,7 @@ class LotesSaidaCustosEndpoint(BatchEndpoint):
 
     payload_key = "custos"
     record_key = "COD_CUSTO"
-    error_key = "cod_custo"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

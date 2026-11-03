@@ -41,7 +41,7 @@ class CurraisEndpoint(BatchEndpoint):
 
     payload_key = "currais"
     record_key = "COD_CURRAL"
-    error_key = "cod_curral"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

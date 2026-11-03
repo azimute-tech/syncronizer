@@ -214,7 +214,8 @@ def _unsent(cod):
 def test_send_batches_and_reconciles_per_item_errors():
     ep = AnimaisEndpoint()
     rows = [_unsent(1), _unsent(2), _unsent(3)]
-    http = _Http({"inserted": 2, "updated": 0, "errors": [{"cod_animal": "3", "message": "dup"}]})
+    http = _Http({"inserted": 2, "updated": 0, "errors": [
+        {"index": 2, "chave": "3", "message": "dup"}]})
     res = ep.send(http, rows)
     assert set(res.ok) == {"1", "2"}
     assert [pk for pk, _ in res.failed] == ["3"]
@@ -226,9 +227,9 @@ def test_send_batches_and_reconciles_per_item_errors():
 
 
 def test_send_matches_errors_when_api_echoes_numeric_id():
-    """The API may echo cod_animal as a JSON number; the row must still be marked failed."""
+    """The API may echo chave as a JSON number; the row must still be marked failed."""
     ep = AnimaisEndpoint()
-    http = _Http({"inserted": 1, "errors": [{"cod_animal": 3, "message": "dup"}]})
+    http = _Http({"inserted": 1, "errors": [{"index": 1, "chave": 3, "message": "dup"}]})
     res = ep.send(http, [_unsent(1), _unsent(3)])
     assert res.ok == ["1"] and [pk for pk, _ in res.failed] == ["3"]
 

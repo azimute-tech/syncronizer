@@ -46,7 +46,7 @@ class CurvasLoteEndpoint(BatchEndpoint):
 
     payload_key = "curvas_lote"
     record_key = "COD_LOTE"
-    error_key = "cod_lote"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

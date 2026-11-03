@@ -126,6 +126,7 @@ def test_send_posts_batch_under_curvas_key_without_farm_id():
 
 def test_send_reconciles_per_item_errors():
     ep = CurvasEndpoint()
-    http = _Http({"inserted": 1, "errors": [{"cod_curva": "22", "message": "raça inexistente"}]})
+    http = _Http({"inserted": 1, "errors": [
+        {"index": 1, "chave": "22", "message": "raça inexistente"}]})
     res = ep.send(http, [_unsent(21), _unsent(22)])
     assert res.ok == ["21"] and [pk for pk, _ in res.failed] == ["22"]

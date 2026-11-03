@@ -134,7 +134,7 @@ def test_send_reconciles_per_item_errors_pela_chave():
     record certo (o mesmo lote aparece em vários dias no mesmo chunk)."""
     ep = ControleDiarioEndpoint()
     http = _Http({"inserted": 1, "errors": [
-        {"chave": "10139|2026-08-05|REBANHO", "message": "lote inexistente"}]})
+        {"index": 1, "chave": "10139|2026-08-05|REBANHO", "message": "lote inexistente"}]})
     res = ep.send(http, [_unsent(10138), _unsent(10139)])
     assert res.ok == ["10138|2026-08-05|REBANHO"]
     assert [pk for pk, _ in res.failed] == ["10139|2026-08-05|REBANHO"]

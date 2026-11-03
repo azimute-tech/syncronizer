@@ -108,6 +108,6 @@ def test_send_posts_batch_under_leituras_cocho_key_without_farm_id():
 def test_send_reconciles_per_item_errors():
     ep = LeiturasCochoEndpoint()
     http = _Http({"inserted": 1, "errors": [
-        {"cod_leitura": "22965", "message": "curral inexistente"}]})
+        {"index": 1, "chave": "22965", "message": "curral inexistente"}]})
     res = ep.send(http, [_unsent(22964), _unsent(22965)])
     assert res.ok == ["22964"] and [pk for pk, _ in res.failed] == ["22965"]

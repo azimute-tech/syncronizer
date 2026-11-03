@@ -126,6 +126,6 @@ def test_send_posts_batch_under_fornecimentos_key_without_farm_id():
 def test_send_reconciles_per_item_errors():
     ep = FornecimentosEndpoint()
     http = _Http({"inserted": 1, "errors": [
-        {"cod_fornecimento": "41021", "message": "lote inexistente"}]})
+        {"index": 1, "chave": "41021", "message": "lote inexistente"}]})
     res = ep.send(http, [_unsent(41020), _unsent(41021)])
     assert res.ok == ["41020"] and [pk for pk, _ in res.failed] == ["41021"]

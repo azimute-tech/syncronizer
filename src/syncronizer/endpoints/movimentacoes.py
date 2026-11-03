@@ -61,7 +61,7 @@ class MovimentacoesEndpoint(BatchEndpoint):
 
     payload_key = "movimentacoes"
     record_key = "COD_HISTORICO"
-    error_key = "cod_historico"
+    error_key = "chave"
     CHUNK = 200
 
     _BASE_SQL = """

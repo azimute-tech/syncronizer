@@ -94,7 +94,7 @@ class PesagensEndpoint(BatchEndpoint):
 
     payload_key = "pesagens"
     record_key = "COD_PESAGEM"
-    error_key = "cod_pesagem"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

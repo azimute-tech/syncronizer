@@ -83,7 +83,7 @@ class CurvasEndpoint(BatchEndpoint):
 
     payload_key = "curvas"
     record_key = "COD_CURVA"
-    error_key = "cod_curva"
+    error_key = "chave"
 
     # subselects escalares POR tabela-filha — nunca juntar GMD e IMS no mesmo FROM
     # (produto cartesiano multiplicaria as listas); FK do IMS é a COM underscore.
