@@ -29,7 +29,7 @@ class MetasAbateEndpoint(BatchEndpoint):
     api_path = "/api/integracoes/tgc/metas-abate"  # URL com hifen (padrao de rota do AgroDB); payload_key segue com underscore
     api_method = "POST"
 
-    # Full scan + row_hash — 3 linhas; edição de meta re-envia via hash.
+    # Full scan + row_hash — poucas linhas; edição de meta re-envia via hash.
     incremental_column = None
     reconcile_deletes = False
 

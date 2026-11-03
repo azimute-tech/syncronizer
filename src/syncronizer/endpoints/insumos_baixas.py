@@ -17,7 +17,7 @@ zerar um silo inteiro (silo hoje encerrado:
 na staging —, logo depois das entradas (order=58).
 
 FULL SCAN + row_hash — centenas de linhas, e a baixa é EDITÁVEL no TGC (a origem
-mantém `CBA_DATA_UPDATE`, preenchida em 115/115) sem o `CBA_CODIGO` mudar; um
+mantém `CBA_DATA_UPDATE`, preenchida em todas as linhas) sem o `CBA_CODIGO` mudar; um
 watermark por código não veria a correção. ``reconcile_deletes`` fica False como nos
 demais feeds.
 
@@ -33,10 +33,10 @@ o padrão do agente; conferido também com WIN1252) e o acento chega certo (ç, 
 Preenchida em poucas baixas, com quebra de linha
 (CRLF) dentro do texto, que é preservada. Regra do contrato: trim, vazio -> None,
 truncada em 500 caracteres (texto livre do operador num BLOB sem limite; o maior hoje
-tem 83).
+fica bem abaixo disso).
 
 Escala: CBA_QTDEKG é BIGINT scale -4 e o driver devolve Decimal com a escala já
-aplicada (1893339.0000 kg).
+aplicada (ex.: 1000.0000 kg).
 """
 from __future__ import annotations
 

@@ -1,8 +1,8 @@
 """TGC `consumo_animais` endpoint — consumo e custo alimentar por ANIMAL x LOTE.
 
-Source: Firebird 2.5 `DET_AC_RESUMO_2011` (ativos, 467 mil linhas na base de staging)
-        + `DET_AC_RESUMO_INATIVOS` (vendidos, 419 mil), AGREGADAS aqui por animal x lote
-        (12,7 mil linhas, 9.136 animais; ~5 s no backup de 09/09/2026).
+Source: Firebird 2.5 `DET_AC_RESUMO_2011` (ativos, centenas de milhares de linhas na
+        base de staging) + `DET_AC_RESUMO_INATIVOS` (vendidos, mesma ordem), AGREGADAS
+        aqui por animal x lote (milhares de linhas; segundos na base de staging).
 Target: POST /api/integracoes/tgc/consumo-animais  body {"consumo_animais": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -15,10 +15,10 @@ e registra o lote do dia por fotografia. As duas contas batem na média e diverg
 por animal. Decisão do sócio (01/10/2026): consumo individual é dado operacional do
 TGC e passa a vir dele. Estudo: AgroDB `docs/relatorios/estudo-tgc/`.
 
-GRÃO animal x lote, não animal x dia: o grão diário tem 886 mil linhas e cresce ~6,7
-mil por dia (decisão D2 do espelho v3 segue valendo). O lote fica no grão porque trocar
-de lote é manejo normal — 28% dos animais têm consumo em mais de um lote, há animal com
-7 — e o consumo do animal é a soma dos lotes por onde passou.
+GRÃO animal x lote, não animal x dia: o grão diário tem centenas de milhares de linhas
+e cresce milhares por dia (decisão D2 do espelho v3 segue valendo). O lote fica no grão
+porque trocar de lote é manejo normal — 28% dos animais têm consumo em mais de um lote,
+há animal com vários — e o consumo do animal é a soma dos lotes por onde passou.
 
 DUAS JANELAS, somadas aqui porque só o Firebird tem o dia:
   total            tudo o que o animal comeu naquele lote;
@@ -30,14 +30,14 @@ FILTROS — os do próprio TGC, com a contagem do que ficou de fora viajando jun
   - linha só soma com MS > 0, MN > 0 e custo/cab > 0 (o filtro de
     `PROC_RESULTADO_INDIVIDUAL`); as demais contam em LINHAS_DESCARTADAS;
   - linha com data posterior à saída do animal fica fora e conta em LINHAS_POS_SAIDA:
-    o TGC continua gerando consumo para animal morto por até 29 dias (29 dos 43 mortos
+    o TGC continua gerando consumo para animal morto por semanas (67% dos mortos
     da staging), e só VENDA migra para a tabela de inativos;
   - D-1 (`DACRES_DATA < CURRENT_DATE`), como nos feeds de fornecimento e controle
     diário: o dia corrente é recontabilizado ao longo do dia.
 
 FULL SCAN + row_hash — o TGC recontabiliza dias fechados (troca de custo de ração,
 correção de trato) e a linha agregada muda sem deixar watermark. Só as linhas que
-mudaram viajam: todo dia, as dos animais ativos (~5,8 mil); as de quem já saiu ficam
+mudaram viajam: todo dia, as dos animais ativos (milhares); as de quem já saiu ficam
 paradas. ``reconcile_deletes`` fica False como nos demais feeds — um animal x lote que
 some da origem (reprocessamento) fica com a última soma conhecida no destino.
 

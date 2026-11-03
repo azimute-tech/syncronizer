@@ -46,8 +46,8 @@ def test_arrays_sao_ordenados_no_transform():
 
 
 def test_curva_sem_ims_e_dado_real():
-    """Na base real TODAS as 95 curvas têm GMD mas só 13 têm IMS — lista NULL vira
-    [] (curva sem projeção de IMS), nunca um erro."""
+    """Na base real TODAS as curvas têm GMD mas só uma minoria tem IMS — lista NULL
+    vira [] (curva sem projeção de IMS), nunca um erro."""
     ep = CurvasEndpoint()
     r = ep.transform(_row(IMS_LISTA=None))
     assert r["IMS_DIARIA"] == []

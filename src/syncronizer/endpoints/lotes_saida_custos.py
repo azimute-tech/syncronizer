@@ -1,6 +1,6 @@
 """TGC `lotes_saida_custos` endpoint — rateio financeiro do abate (DET_LOTESAIDA_FIN).
 
-Source: Firebird 2.5 `DET_LOTESAIDA_FIN` (576 linhas na base de staging).
+Source: Firebird 2.5 `DET_LOTESAIDA_FIN` (centenas de linhas na base de staging).
 Target: POST /api/integracoes/tgc/lotes-saida-custos  body {"custos": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -13,26 +13,26 @@ USO: RECONCILIAÇÃO do fechamento — é o rateio que o PRÓPRIO TGC fez, nunca
 canônica. A receita e os custos canônicos do abate são do AgroDB; este espelho serve
 para confrontar os dois e mostrar a divergência.
 
-A tabela é um TEMPLATE de 12 rubricas por lote (12 x 48 = 576 linhas exatas): BONIFICACOES
+A tabela é um TEMPLATE de 12 rubricas por lote (lotes x 12 = linhas, exato): BONIFICACOES
 COURO, COMMISSAO VENDA, CREDITO ICMS, CREDITO ICMS FRETE, FUNRURAL, VENDA ANIMAIS e
-mais 6. Na staging só a rubrica VENDA ANIMAIS está preenchida — 42 linhas com valor,
-534 com 0,00 (e `DLSF_PORC_VALOR` 0,00 nas mesmas 534).
+mais 6. Na staging só a rubrica VENDA ANIMAIS está preenchida — poucas linhas com
+valor, as demais com 0,00 (e `DLSF_PORC_VALOR` 0,00 nas mesmas).
 
-FULL SCAN + row_hash — 576 linhas, e o rateio é justamente o que o operador corrige
-depois de fechar a nota do frigorífico; não existe `DLSF_DATA_UPDATE` para watermark, e
-um watermark por `DLSF_CODIGO` congelaria as rubricas no estado em que o template
-nasceu (zeradas). Mesmo critério de `lotes_saida`. ``reconcile_deletes`` fica False
-como nos demais feeds.
+FULL SCAN + row_hash — centenas de linhas, e o rateio é justamente o que o operador
+corrige depois de fechar a nota do frigorífico; não existe `DLSF_DATA_UPDATE` para
+watermark, e um watermark por `DLSF_CODIGO` congelaria as rubricas no estado em que o
+template nasceu (zeradas). Mesmo critério de `lotes_saida`. ``reconcile_deletes`` fica
+False como nos demais feeds.
 
 Zeros: `DLSF_VALOR` é R$, então o 0,00 do template não preenchido é "não informado" e
 vira None pela regra geral do contrato ("nunca plantar custo/valor falso") — mandar
-534 rubricas de R$ 0,00 faria a reconciliação afirmar que não houve comissão, ICMS nem
+as rubricas de R$ 0,00 faria a reconciliação afirmar que não houve comissão, ICMS nem
 FUNRURAL, quando o que houve foi ausência de lançamento. `DLSF_PORC_VALOR` NÃO é R$ e
 segue como número (0.0 inclusive): é o percentual do rateio, e o destino já enxerga a
 ausência pelo VALOR nulo ao lado.
 
-`DLSF_STATUS` é CHAR(1) na origem, não texto livre: 'R' (384 linhas) e 'D' (192).
-`DLSF_FLAG_IMPOSTO` é o 'S'/'N' clássico (336 'S', 240 'N') e vira boolean.
+`DLSF_STATUS` é CHAR(1) na origem, não texto livre: 'R' ou 'D'.
+`DLSF_FLAG_IMPOSTO` é o 'S'/'N' clássico e vira boolean.
 """
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ from syncronizer.endpoints._common import (
 def _valor(value):
     """Valor da rubrica em R$, ou None para o 0,00 do template não preenchido.
 
-    534 das 576 linhas da staging são rubricas do template que ninguém lançou; mandá-las
+    93% das linhas da staging são rubricas do template que ninguém lançou; mandá-las
     como R$ 0,00 afirmaria "não houve esse custo" em vez de "não foi informado".
     """
     valor = num(value)

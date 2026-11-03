@@ -33,8 +33,8 @@ def test_transform_shape_and_types():
 
 
 def test_kg_zero_e_dado_real_mas_custo_zero_vira_none():
-    """kg 0 é trato previsto e não fornecido (2.443 linhas na base real) e VIAJA como
-    0.0; custo 0,0000 é o default "não informado" do TGC (1.838 linhas) e vira None —
+    """kg 0 é trato previsto e não fornecido (há linhas assim na base real) e VIAJA
+    como 0.0; custo 0,0000 é o default "não informado" do TGC e vira None —
     encaminhá-lo plantaria custo alimentar falso de R$ 0/kg."""
     ep = FornecimentosEndpoint()
     r = ep.transform(_row(REALIZADO_KG=Decimal("0.0000"), SOBRA_KG=Decimal("0.0000"),
@@ -48,7 +48,7 @@ def test_kg_zero_e_dado_real_mas_custo_zero_vira_none():
 
 def test_data_e_do_fornecimento_nunca_a_de_registro():
     """CFORN_DATAFORNECIDO é a data do trato; CFORN_DATAREG é quando foi digitado
-    (114 linhas divergem na base real — registro na manhã seguinte). Usar a data de
+    (há linhas que divergem na base real — registro na manhã seguinte). Usar a data de
     registro jogaria o consumo no dia errado. Não existe coluna CFORN_DATA."""
     spec = FornecimentosEndpoint().extract_spec(ExtractContext(last_watermark=None))
     assert "CFORN_DATAFORNECIDO" in spec.sql
@@ -56,7 +56,7 @@ def test_data_e_do_fornecimento_nunca_a_de_registro():
 
 
 def test_extract_spec_filtra_d1_full_scan():
-    """O dia corrente fica de fora (tratos 1..4 lançados ao longo do dia + sobra que
+    """O dia corrente fica de fora (vários tratos lançados ao longo do dia + sobra que
     só fecha no dia seguinte): espelhar o dia aberto enviaria consumo parcial."""
     ep = FornecimentosEndpoint()
     spec = ep.extract_spec(ExtractContext(last_watermark=None))

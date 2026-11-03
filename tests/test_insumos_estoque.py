@@ -1,6 +1,6 @@
 """Testes dos feeds do ESTOQUE de insumos (Relatório de Insumos do AgroDB):
-`insumos_entradas` (DET_ITENS_NFINSUMOS x CAD_NFINSUMOS, 361 cargas na staging) e
-`insumos_baixas` (CAD_BAIXA_ALIM, 115 baixas).
+`insumos_entradas` (DET_ITENS_NFINSUMOS x CAD_NFINSUMOS, centenas de cargas na staging) e
+`insumos_baixas` (CAD_BAIXA_ALIM, centenas de baixas).
 """
 import json
 from datetime import date, time
@@ -73,7 +73,7 @@ def test_entradas_qtde_zero_e_dado_real_e_ausente_viaja_none():
 
 def test_entradas_regra_de_zero():
     """0 é o default "não informado/não medido" do TGC: peso da NF, valores, umidade
-    (0 em 355/361) e impureza (0 em 357/361) viram None."""
+    (0 em quase todas) e impureza (0 em quase todas) viram None."""
     r = InsumosEntradasEndpoint().transform(_entrada(
         PESO_NF_KG=Decimal("0.00"), VALOR_UNIT_RS_T=Decimal("0.00"),
         VALOR_TOTAL_RS=Decimal("0.00"), UMIDADE_PCT=Decimal("0.00"),
@@ -87,8 +87,8 @@ def test_entradas_regra_de_zero():
 
 
 def test_entradas_lancada_estoque_e_booleano_do_flag_contab():
-    """DNFI_FLAG_CONTAB = 'S' — mesmo predicado da Posição do TGC. A carga 1125 da
-    staging está 'N' (recebida e não lançada) e conta no saldo do AgroDB."""
+    """DNFI_FLAG_CONTAB = 'S' — mesmo predicado da Posição do TGC. Há carga da
+    staging em 'N' (recebida e não lançada) e conta no saldo do AgroDB."""
     ep = InsumosEntradasEndpoint()
     assert ep.transform(_entrada(LANCADA_ESTOQUE="S"))["LANCADA_ESTOQUE"] is True
     r = ep.transform(_entrada(LANCADA_ESTOQUE="N", DATA_LANCAMENTO=None))
@@ -106,14 +106,14 @@ def test_entradas_hora_recebimento_vira_hhmm():
 
 
 def test_entradas_numero_nf_e_texto():
-    """CNFI_NUMERO é texto livre: 44 cargas da staging não são um número."""
+    """CNFI_NUMERO é texto livre: várias cargas da staging não são um número."""
     ep = InsumosEntradasEndpoint()
     for numero in ("1001-1003", "AJUSTE2", "NOTA AJUSTE", ",123", "100"):
         assert ep.transform(_entrada(NUMERO_NF=numero))["NUMERO_NF"] == numero
 
 
 def test_entradas_vazios_viram_none():
-    """PLACA e SERIE_NF estão vazias em 361/361 ('' ou NULL); o ticket da fazenda é
+    """PLACA e SERIE_NF estão vazias em todas ('' ou NULL); o ticket da fazenda é
     INTEGER no TGC, TEXT no espelho, e 0 = sem ticket."""
     ep = InsumosEntradasEndpoint()
     r = ep.transform(_entrada(PLACA="", SERIE_NF=None, TICKET_FAZENDA=0))

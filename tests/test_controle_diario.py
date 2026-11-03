@@ -43,7 +43,7 @@ def test_transform_shape_and_types():
 
 def test_chave_e_a_identidade_de_negocio():
     """CNT_CODIGO é PK física mas um re-cálculo do TGC recria a linha com outro
-    código — a identidade de negócio é COD_LOTE|DATA|TIPO (única nas 6.847 linhas
+    código — a identidade de negócio é COD_LOTE|DATA|TIPO (única em todas as linhas
     da base real): o espelho sobrescreve o dia, nunca duplica."""
     ep = ControleDiarioEndpoint()
     r = ep.transform(_row())

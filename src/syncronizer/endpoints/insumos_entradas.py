@@ -17,7 +17,7 @@ depois das batidas (55/56), no bloco do estoque (order=57).
 
 FULL SCAN + row_hash — centenas de linhas, e a carga É editada depois de gravada: o
 lançamento no estoque do TGC (`DNFI_FLAG_CONTAB` vira 'S' e ganha `DNFI_DATA_CONTAB`)
-acontece em lote, dias depois do recebimento (334 das 361 cargas foram lançadas depois
+acontece em lote, dias depois do recebimento (93% das cargas foram lançadas depois
 do dia em que chegaram), sempre com o mesmo `DNFI_CODIGO`. Um watermark por código
 congelaria a carga no estado "não lançada" para sempre. ``reconcile_deletes`` fica
 False como nos demais feeds.
@@ -25,11 +25,11 @@ False como nos demais feeds.
 Datas — a data da ENTRADA no estoque do AgroDB é o RECEBIMENTO (`CNFI_DATA_REC`,
 decisão de 20/10/2026), não a da NF (`CNFI_DATAEMISSAO`) nem a "data de entrega"
 (`CNFI_DATAENTREGA`) que a Posição do TGC usa. As três viajam; o destino escolhe.
-`CNFI_DATA_REC` ≠ `CNFI_DATAENTREGA` em 16 das 361 cargas (há NF de silagem
+`CNFI_DATA_REC` ≠ `CNFI_DATAENTREGA` em poucas cargas (há NF de silagem
 recebida um mês depois de emitida). Nenhuma das duas é NULL na staging.
 
 `LANCADA_ESTOQUE` = `DNFI_FLAG_CONTAB = 'S'` — o mesmo predicado da Posição do TGC
-(NULL ou 'N' são False). 1 carga na staging não está lançada (recebida e
+(NULL ou 'N' são False). Há carga na staging que não está lançada (recebida e
 ainda sem `DNFI_DATA_CONTAB`): ela CONTA no saldo do AgroDB,
 que a sinaliza na tela — por isso viaja como qualquer outra, sem filtro na origem.
 
@@ -39,34 +39,34 @@ Regra de zero (contrato, seção 12):
     staging). Sem quality gate local, como em todo o agente.
   * `PESO_NF_KG`, `VALOR_UNIT_RS_T`, `VALOR_TOTAL_RS`: 0 vira None (nenhum zero na
     staging hoje; o default "não informado" do TGC é 0).
-  * `UMIDADE_PCT` / `IMPUREZA_PCT`: 0,00 é "não medido" e vira None — 355 e 357 das
-    361 cargas.
+  * `UMIDADE_PCT` / `IMPUREZA_PCT`: 0,00 é "não medido" e vira None — em quase
+    todas as cargas.
   * `TICKET_FAZENDA` (DNFI_TICKETFAZ, INTEGER): 0 vira None, e viaja como TEXTO
-    (`ticket_fazenda` é TEXT no espelho). Preenchido (> 0) em 9 cargas; NULL nas
-    outras 352.
-  * `PLACA` vazia vira None — e está vazia em TODAS as 361 (82 NULL, 279 ''). A
+    (`ticket_fazenda` é TEXT no espelho). Preenchido (> 0) em poucas cargas; NULL nas
+    demais.
+  * `PLACA` vazia vira None — e está vazia em TODAS (NULL ou ''). A
     coluna entra pronta para quando a fazenda passar a preencher; sem ela o dado novo
     seria descartado em silêncio.
 
 ARMADILHAS medidas na staging:
   * `VALOR_UNIT_RS_T` é R$ por TONELADA RECEBIDA, não por kg: ex.: 1.004,00 para 50.000 kg
-    recebidos e R$ 50.200,00 (= 50.200 / 50 t). Confere em 361/361 cargas como
-    valor_total ÷ kg recebido × 1000 (pelo peso da NF, só 150). O nome do campo
+    recebidos e R$ 50.200,00 (= 50.200 / 50 t). Confere em todas as cargas como
+    valor_total ÷ kg recebido × 1000 (pelo peso da NF, só 42%). O nome do campo
     carrega a unidade para ninguém multiplicar por kg.
-  * kg recebido ≠ kg da NF (`PESO_NF_KG`) em 212 das 361 cargas — é a quebra de
+  * kg recebido ≠ kg da NF (`PESO_NF_KG`) em 59% das cargas — é a quebra de
     transporte, informação legítima; o saldo usa SEMPRE o recebido.
-  * `NUMERO_NF` é texto livre: 44 cargas não são um número (faixa "1001-1003" para uma
+  * `NUMERO_NF` é texto livre: há NF que não é um número (faixa "1001-1003" para uma
     carga de várias NFs, palavras no lugar do número, números com vírgula). As palavras são
     lançamentos de ajuste de estoque do operador e entram no saldo do TGC — viajam como
-    estão. `SERIE_NF` está vazia em todas (279 '' e 82 NULL) e vira None.
+    estão. `SERIE_NF` está vazia em todas ('' ou NULL) e vira None.
   * `CNFI_HORA_REC` é TIME -> texto `HH:MM` (como `batidas`): segundos são cortados
-    (01:04:06 -> "01:04") e 00:00 (1 carga) viaja como está — sem regra de ausência
-    para hora no contrato. 10:00 aparece em 191 das 361 cargas: tem cara de hora
+    (01:04:06 -> "01:04") e 00:00 (raro) viaja como está — sem regra de ausência
+    para hora no contrato. 10:00 aparece em 53% das cargas: tem cara de hora
     padrão da tela de recebimento, não de hora real — quem ler a hora deve saber disso.
   * Join: o cabeçalho entra por JOIN (item sem cabeçalho não é carga; 0 casos), a
     compra e o fornecedor por LEFT JOIN — uma compra apagada não pode sumir com o
     peso recebido (0 casos hoje; `FORNECEDOR` viajaria None).
-  * `DNFI_FLAG_ESTOQUE` é 'S' em 361/361 e não entra: o predicado de "lançada" do TGC
+  * `DNFI_FLAG_ESTOQUE` é 'S' em todas e não entra: o predicado de "lançada" do TGC
     é o `DNFI_FLAG_CONTAB`.
   * Texto: CHAR/VARCHAR em WIN1252 na origem; com `charset = UTF8` (o padrão do
     agente) o servidor translitera e o driver devolve str (nome de

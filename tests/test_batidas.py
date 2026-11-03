@@ -1,5 +1,5 @@
-"""Testes dos feeds da fábrica de ração: `batidas` (CAD_BATIDA, 1.691 linhas na
-staging) e `batidas_itens` (DET_BATIDA, 8.484 linhas).
+"""Testes dos feeds da fábrica de ração: `batidas` (CAD_BATIDA, milhares de linhas
+na staging) e `batidas_itens` (DET_BATIDA, milhares de linhas).
 """
 import json
 from datetime import date, time
@@ -44,7 +44,7 @@ def test_horas_viram_texto_hhmm():
 
 
 def test_hora_zero_viaja_como_esta():
-    """DIVERGÊNCIA: CBT_INICIO/CBT_FIM são 00:00:00 em 1.691/1.691 linhas da staging —
+    """DIVERGÊNCIA: CBT_INICIO/CBT_FIM são 00:00:00 em todas as linhas da staging —
     o default intocado do TIME. O contrato não define regra de ausência para hora, e
     não há quality gate local em lugar nenhum do agente: "00:00" viaja e é o DESTINO
     que decide lê-lo como "não informado"."""
@@ -66,7 +66,7 @@ def test_kg_zero_e_dado_real_mas_custo_zero_vira_none():
 
 
 def test_colunas_vazias_na_staging_ainda_assim_existem():
-    """CBT_QTDECABECA e CBT_NOME_MOTORISTA são NULL em 1.691/1.691 linhas. As colunas
+    """CBT_QTDECABECA e CBT_NOME_MOTORISTA são NULL em todas as linhas. As colunas
     entram prontas para quando a fazenda passar a preencher — sem elas o dado novo
     seria descartado em silêncio (mesmo racional do VALOR_ENTRADA em `animais`)."""
     r = BatidasEndpoint().transform(_batida())
@@ -77,7 +77,7 @@ def test_colunas_vazias_na_staging_ainda_assim_existem():
 
 def test_extract_spec_full_scan_sem_filtro_d1():
     """Full scan pelo mesmo motivo de `fornecimentos` (CBT_DATA_UPDATE existe e está
-    preenchida em 1.691/1.691: a batida É corrigida depois de gravada).
+    preenchida em todas as linhas: a batida É corrigida depois de gravada).
 
     Mas SEM o filtro D-1 de `fornecimentos`/`leituras_cocho`: lá a linha é um agregado
     do dia que só fecha à meia-noite; aqui cada linha é um evento discreto de mistura,
@@ -92,8 +92,8 @@ def test_extract_spec_full_scan_sem_filtro_d1():
 
 
 def test_flag_fim_nao_e_usada_como_filtro():
-    """CBT_FLAG_FIM seria a trava natural de "batida terminada", mas está em 'N' nas
-    1.691 linhas da staging — nunca vira 'S' nesta base, então não serve de filtro."""
+    """CBT_FLAG_FIM seria a trava natural de "batida terminada", mas está em 'N' em
+    todas as linhas — nunca vira 'S' nesta base, então não serve de filtro."""
     spec = BatidasEndpoint().extract_spec(ExtractContext(last_watermark=None))
     assert "CBT_FLAG_FIM" not in spec.sql
 
@@ -126,8 +126,8 @@ def test_itens_transform_shape_and_types():
 
 
 def test_itens_kg_zero_e_dado_real_mas_custo_zero_vira_none():
-    """101 linhas da staging têm DBT_QTDE 0,0000 — ingrediente previsto e não colocado
-    na mistura, informação legítima de aderência à dieta. Já as 90 linhas com
+    """Há linhas da staging com DBT_QTDE 0,0000 — ingrediente previsto e não colocado
+    na mistura, informação legítima de aderência à dieta. Já as linhas com
     DBT_CUSTO 0,0000 são "não informado"."""
     ep = BatidasItensEndpoint()
     r = ep.transform(_item(REALIZADO_KG=Decimal("0.0000"), CUSTO_RS=Decimal("0.0000")))
@@ -136,7 +136,7 @@ def test_itens_kg_zero_e_dado_real_mas_custo_zero_vira_none():
 
 
 def test_ms_pct_vazio_na_staging_ainda_assim_existe():
-    """DIVERGÊNCIA: DBT_MS é NULL em 8.484/8.484. A coluna entra pronta; o %MS efetivo
+    """DIVERGÊNCIA: DBT_MS é NULL em todas. A coluna entra pronta; o %MS efetivo
     pode ser derivado no destino por REAL_KG_MS / REALIZADO_KG."""
     ep = BatidasItensEndpoint()
     r = ep.transform(_item())

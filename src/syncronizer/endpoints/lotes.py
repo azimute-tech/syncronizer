@@ -20,7 +20,7 @@ would hide what the source actually holds.
 
 Contrato v3 (ago/2026) — bloco de consumo/curvas:
   * COD_CURVA (`CLL_COD_CURVA`) — a curva de crescimento (DET_CATEGORIA) que o feed
-    `curvas` espelha. 25 lotes na base real carregam 0 (= sem curva atribuída), o
+    `curvas` espelha. Alguns lotes na base real carregam 0 (= sem curva atribuída), o
     sentinelo padrão do TGC, então 0 vira None via ``opt_code`` como toda FK daqui.
   * DESTINO (`CLL_DESTINO`) — o nome da meta de abate (AUX_DESTINOANIMAL, feed
     `metas_abate`), ex. "MÉDIO 520". É NOME, não código: a PK real da tabela de
@@ -99,7 +99,7 @@ class LotesEndpoint(BatchEndpoint):
             "DATA_MEDIA_ENTRADA": iso_date(row.get("DATA_MEDIA_ENTRADA")),
             "DATA_FIM": iso_date(row.get("DATA_FIM")),
             "NUM_CONTRATO": opt_str(row.get("NUM_CONTRATO")),
-            # curva de crescimento — 0 é o sentinelo "sem curva" do TGC (25 lotes na base)
+            # curva de crescimento — 0 é o sentinelo "sem curva" do TGC
             "COD_CURVA": opt_code(row.get("COD_CURVA")),
             # NOME da meta de abate (AUX_DESTINOANIMAL.ADA_NOME), ex. "MÉDIO 520"
             "DESTINO": opt_str(row.get("DESTINO")),

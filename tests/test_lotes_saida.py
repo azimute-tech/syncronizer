@@ -1,5 +1,5 @@
-"""Testes dos feeds do fechamento de abate: `lotes_saida` (CAD_LOTESAIDA, 48 linhas na
-staging) e `lotes_saida_custos` (DET_LOTESAIDA_FIN, 576 linhas).
+"""Testes dos feeds do fechamento de abate: `lotes_saida` (CAD_LOTESAIDA, dezenas de
+linhas na staging) e `lotes_saida_custos` (DET_LOTESAIDA_FIN, centenas de linhas).
 """
 import json
 from datetime import date
@@ -39,8 +39,8 @@ def test_transform_shape_and_types():
 
 
 def test_valores_zerados_do_tgc_viram_none():
-    """Na staging CLS_VALOR_IMPOSTOS, CLS_VALOR_NF e CLS_CUSTODIARIA são 0,00 em 48/48
-    e CLS_VALORBRUTO/LIQUIDO em 6/48: é o default "não informado" do TGC. Encaminhar 0
+    """Na staging CLS_VALOR_IMPOSTOS, CLS_VALOR_NF e CLS_CUSTODIARIA são 0,00 em todas
+    e CLS_VALORBRUTO/LIQUIDO em poucas: é o default "não informado" do TGC. Encaminhar 0
     plantaria receita falsa de R$ 0 num campo que o relatório usa como FALLBACK do
     romaneio do AgroDB."""
     r = LotesSaidaEndpoint().transform(
@@ -51,10 +51,10 @@ def test_valores_zerados_do_tgc_viram_none():
 
 
 def test_peso_frigorifico_zero_vira_none_mas_os_outros_pesos_nao():
-    """Exceção explícita do contrato: FRIG_PESO_KG 0 é "comum" e vira None (48/48 na
+    """Exceção explícita do contrato: FRIG_PESO_KG 0 é "comum" e vira None (em toda a
     staging). CONF_PESO_KG e PORT_PESO_KG são pesos e 0 viaja como dado real — mesmo
-    que PORT_PESO_KG esteja 0 em 44/48 (divergência documentada no módulo: estender a
-    regra a ele é decisão do contrato, não deste transform)."""
+    que PORT_PESO_KG esteja 0 em quase todas (divergência documentada no módulo:
+    estender a regra a ele é decisão do contrato, não deste transform)."""
     r = LotesSaidaEndpoint().transform(_lote(CONF_PESO_KG=Decimal("0.00")))
     assert r["FRIG_PESO_KG"] is None
     assert r["PORT_PESO_KG"] == 0.0
@@ -110,8 +110,8 @@ def test_custos_transform_shape():
 
 
 def test_rubrica_do_template_nao_lancada_vira_none():
-    """DET_LOTESAIDA_FIN é um template de 12 rubricas por lote (12 x 48 = 576). Na
-    staging só VENDA ANIMAIS está preenchida: 534 linhas têm 0,00. Mandá-las como R$
+    """DET_LOTESAIDA_FIN é um template de 12 rubricas por lote (lotes x 12 = linhas). Na
+    staging só VENDA ANIMAIS está preenchida: as demais têm 0,00. Mandá-las como R$
     0,00 afirmaria "não houve comissão/ICMS/FUNRURAL" em vez de "não foi informado"."""
     r = LotesSaidaCustosEndpoint().transform(_custo())
     assert r["VALOR"] is None

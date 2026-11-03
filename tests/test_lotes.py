@@ -35,7 +35,7 @@ def test_transform_shape_and_types():
 
 
 def test_bloco_de_curva_do_contrato_v3():
-    """COD_CURVA 0 é o sentinelo "sem curva" do TGC (25 lotes na base real) e vira
+    """COD_CURVA 0 é o sentinelo "sem curva" do TGC (há lotes assim na base real) e vira
     None; DESTINO é o NOME da meta (AUX_DESTINOANIMAL.ADA_NOME); CUSTO_FIXO_DIA
     segue cru — 0,50 na base real é diária válida, não "não informado"."""
     ep = LotesEndpoint()

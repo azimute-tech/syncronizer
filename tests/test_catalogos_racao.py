@@ -1,6 +1,6 @@
 """Testes dos catálogos que dão NOME à dieta e ao ingrediente nos relatórios:
-`racoes` (CAD_RACAO_PROD + CAD_RACAO, 47 linhas na staging) e `alimentos`
-(CAD_ALIMENTO, 113 linhas).
+`racoes` (CAD_RACAO_PROD + CAD_RACAO, dezenas de linhas na staging) e
+`alimentos` (CAD_ALIMENTO, centenas de linhas).
 """
 import json
 from datetime import date
@@ -30,7 +30,7 @@ def test_racoes_transform_shape():
 
 
 def test_status_da_racao_e_ai_nao_sn():
-    """CRP_STATUS é 'A'/'I' (ativo/inativo — 3 e 44 na staging), NÃO o 'S'/'N' de flag
+    """CRP_STATUS é 'A'/'I' (ativo/inativo — ambos na staging), NÃO o 'S'/'N' de flag
     booleana dos outros feeds. Tratá-lo como boolean transformaria toda ração ativa em
     False."""
     ep = RacoesEndpoint()
@@ -48,8 +48,8 @@ def test_join_e_left_para_nome_ausente_nao_sumir_a_linha():
 
 
 def test_racoes_full_scan_sem_reconcile():
-    """47 linhas; renomear a dieta precisa re-enviar (row_hash). Uma ração sai de
-    circulação virando STATUS='I', não sendo deletada — nada a tombstonear."""
+    """Dezenas de linhas; renomear a dieta precisa re-enviar (row_hash). Uma ração sai
+    de circulação virando STATUS='I', não sendo deletada — nada a tombstonear."""
     ep = RacoesEndpoint()
     spec = ep.extract_spec(ExtractContext(last_watermark=None))
     assert ep.incremental_column is None and ep.reconcile_deletes is False
@@ -76,9 +76,9 @@ def test_alimentos_transform_shape():
 
 
 def test_custo_medio_zero_vira_none():
-    """77 das 113 linhas da staging têm AA_CUSTOMEDIO 0,0000 — ingrediente cadastrado e
-    nunca comprado. Encaminhar 0 criaria um ingrediente que "custa R$ 0/kg" e zeraria o
-    custo alimentar de toda dieta que o usa."""
+    """A maioria das linhas da staging tem AA_CUSTOMEDIO 0,0000 — ingrediente cadastrado
+    e nunca comprado. Encaminhar 0 criaria um ingrediente que "custa R$ 0/kg" e zeraria
+    o custo alimentar de toda dieta que o usa."""
     ep = AlimentosEndpoint()
     assert ep.transform(_alimento())["CUSTO_MEDIO_RS"] is None
     assert ep.transform(_alimento(CUSTO_MEDIO_RS=None))["CUSTO_MEDIO_RS"] is None
@@ -120,12 +120,12 @@ def test_alimentos_payload_ganha_os_seis_campos_do_estoque():
     assert r["CONTROLA_ESTOQUE"] is True
     assert r["ESTOQUE_MINIMO_DIAS"] == 20 and isinstance(r["ESTOQUE_MINIMO_DIAS"], int)
     assert r["COD_ALIMENTO"] == "80038" and r["CUSTO_MEDIO_RS"] == 1.058
-    assert r["ESTOQUE_MINIMO_KG"] is None    # 0,00 em 137/137 na staging
+    assert r["ESTOQUE_MINIMO_KG"] is None    # 0,00 em todas as linhas da staging
     assert r["MS_PCT"] == 88.0 and r["UNIDADE"] == "KG"
 
 
 def test_controla_estoque_e_rel_estoque_atual_igual_a_s():
-    """Mesmo predicado da Posição do TGC (`AA_REL_ESTOQUE_ATUAL = 'S'`): 'N' (8 silos
+    """Mesmo predicado da Posição do TGC (`AA_REL_ESTOQUE_ATUAL = 'S'`): 'N' (silos
     encerrados na staging) e NULL ficam fora."""
     ep = AlimentosEndpoint()
     assert ep.transform(_alimento_estoque(CONTROLA_ESTOQUE="N"))["CONTROLA_ESTOQUE"] is False
@@ -133,7 +133,7 @@ def test_controla_estoque_e_rel_estoque_atual_igual_a_s():
 
 
 def test_estoque_minimo_e_ms_regra_de_zero():
-    """AA_ESTOQUEMINIMO é 0 em 137/137 (ninguém cadastrou mínimo em kg); 0 dias e MS
+    """AA_ESTOQUEMINIMO é 0 em todas (ninguém cadastrou mínimo em kg); 0 dias e MS
     0,00 (AGUA-PADRAO) também são "não cadastrado". MS 100,00 dos minerais é real."""
     ep = AlimentosEndpoint()
     r = ep.transform(_alimento_estoque(ESTOQUE_MINIMO_DIAS=0, MS_PCT=Decimal("0.00")))
@@ -149,7 +149,7 @@ def test_estoque_minimo_e_ms_regra_de_zero():
 
 
 def test_data_ult_custo_e_unidade():
-    """DIVERGÊNCIA: AA_DATAULTCUSTO é NULL em 137/137 na staging — a coluna entra pronta."""
+    """DIVERGÊNCIA: AA_DATAULTCUSTO é NULL em toda a staging — a coluna entra pronta."""
     ep = AlimentosEndpoint()
     r = ep.transform(_alimento_estoque())
     assert "DATA_ULT_CUSTO" in r and r["DATA_ULT_CUSTO"] is None
