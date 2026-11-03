@@ -1,6 +1,6 @@
 """Ciclo logo após código novo, mesmo fora da janela.
 
-Pedido do Nelson (20/10/2026): quando as máquinas instaladas atualizarem, a
+Pedido do sócio (20/10/2026): quando as máquinas instaladas atualizarem, a
 sincronização precisa rodar de novo para garantir o sincronismo, mesmo fora da
 janela de execução. Sem isto, um self-update aplicado às 19:30 (janela 07–19)
 só sincronizaria no dia seguinte — e um feed novo (ex.: `insumos_entradas`)

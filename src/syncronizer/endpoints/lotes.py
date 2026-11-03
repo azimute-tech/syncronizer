@@ -27,7 +27,7 @@ Contrato v3 (ago/2026) — bloco de consumo/curvas:
     metas é ADA_NOME.
   * CUSTO_FIXO_DIA (`CLL_CUSTOFIXO`) — diária fixa R$/cab/dia. BIGINT scale -4 no
     Firebird; o driver devolve Decimal já com a escala aplicada (2.5000 → 2.5).
-    Base real: 130 lotes a 2,50 e 2 a 0,50 — sem zeros, valor baixo é valor real,
+    Base real: nenhum zero, e valor baixo é valor real,
     então segue cru via ``num`` (sem regra 0→None).
 
 Adicionar coluna muda o ``row_hash`` de TODOS os lotes: o primeiro ciclo depois

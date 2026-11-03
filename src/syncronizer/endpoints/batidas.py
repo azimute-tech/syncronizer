@@ -31,10 +31,10 @@ staging `CBT_QTDEBATIDA` nunca é 0 e `CBT_QTDEPREVISTA` é 0 em 1 linha. Já `C
 de plantar custo de ração falso de R$ 0 — mesmo racional do CUSTO_KG_MN em
 `fornecimentos`.
 
-CBT_CUSTO é o custo TOTAL da batida em R$ (735,16 para 1.088 kg), não R$/kg. Confira
+CBT_CUSTO é o custo TOTAL da batida em R$ (ex.: 700,50 para 990 kg), não R$/kg. Confira
 com `batidas_itens`, onde DBT_CUSTO é o custo UNITÁRIO do ingrediente: a soma de
-DBT_CUSTO x DBT_QTDE reproduz o CBT_CUSTO (740,10 x 735,16 na batida 2173 — a
-diferença é arredondamento do TGC).
+DBT_CUSTO x DBT_QTDE reproduz o CBT_CUSTO (a diferença, de centavos, é
+arredondamento do TGC).
 
 DIVERGÊNCIAS medidas contra o contrato (documentadas, não corrigidas em silêncio):
   * `CBT_QTDECABECA` é NULL em 1.691/1.691 — o contrato tipa QTD_CABECAS como INTEGER,
@@ -49,7 +49,7 @@ DIVERGÊNCIAS medidas contra o contrato (documentadas, não corrigidas em silên
     (não há variedade de tipo nesta base).
 
 Escalas: CBT_QTDEPREVISTA/CBT_QTDEBATIDA/CBT_CUSTO são BIGINT scale -4 e o driver
-firebirdsql devolve Decimal com a escala já aplicada (1099.9700 kg, 735.1644 R$).
+firebirdsql devolve Decimal com a escala já aplicada (ex.: 1000.0000 kg, 700.5000 R$).
 """
 from __future__ import annotations
 

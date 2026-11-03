@@ -89,8 +89,8 @@ def test_exit_block_only_for_animals_that_left():
 
 
 def test_valor_entrada_zero_do_tgc_vira_none():
-    """CA_VALORENT fica 0,00 quando a fazenda não informa o custo (backup real de
-    Birigui: 0% das linhas preenchidas). 0 é "não informado", não um animal que custou
+    """CA_VALORENT fica 0,00 quando a fazenda não informa o custo (backup real da
+    fazenda de referência: 0% das linhas preenchidas). 0 é "não informado", não um animal que custou
     R$ 0 — encaminhar 0,00 plantaria um custo falso justamente no campo que o AgroDB
     usa como fallback. Mesmo racional do VALOR_SAIDA 0,00 do rebanho vivo; contraste
     deliberado com PESO_ENTRADA=0, que É enviado (problema de qualidade)."""
@@ -140,8 +140,8 @@ def test_transform_drops_corrupted_chip():
 
 def test_transform_keeps_valid_chip_and_ncf():
     ep = AnimaisEndpoint()
-    r = ep.transform(_row(CHIP="963000407320194", NCF="12345"))
-    assert r["CHIP"] == "963000407320194" and r["NCF"] == "12345"
+    r = ep.transform(_row(CHIP="982000000000001", NCF="12345"))
+    assert r["CHIP"] == "982000000000001" and r["NCF"] == "12345"
 
 
 def test_extract_spec_builds_query():

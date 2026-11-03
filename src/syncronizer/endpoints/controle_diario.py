@@ -22,7 +22,7 @@ TIPO (`CNT_TIPO`) — GERAL | REBANHO (3.409 / 3.438 na base): duas visões de c
 do mesmo lote×dia; as duas viajam e o destino escolhe qual ler.
 
 CURRAL_NOME — `CNT_CURRAL` existe mas é VARCHAR(30) com o NOME do curral ("B-1",
-"RMG-2"), não o código. Vai como CURRAL_NOME, seguindo o precedente de
+"C-2"), não o código. Vai como CURRAL_NOME, seguindo o precedente de
 `movimentacoes` (nome fica nome; AgroDB resolve localmente contra currais_tgc).
 Chamá-lo de COD_CURRAL repetiria o bug silencioso de join documentado em `animais`.
 

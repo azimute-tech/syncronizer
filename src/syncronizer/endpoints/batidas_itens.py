@@ -23,11 +23,11 @@ e não colocados na mistura, informação legítima de aderência — e viajam c
 `DBT_CUSTO` 0,0000 (90 linhas) é o default "não informado" do TGC e vira None, mesmo
 racional do CUSTO_KG_MN em `fornecimentos`.
 
-CUIDADO com a semântica de DBT_CUSTO: é o custo UNITÁRIO do alimento em R$/kg (0,1907
-para 426 kg de um ingrediente), NÃO o custo total da linha. O contrato o nomeia
+CUIDADO com a semântica de DBT_CUSTO: é o custo UNITÁRIO do alimento em R$/kg (ex.: 0,20
+R$/kg), NÃO o custo total da linha. O contrato o nomeia
 `custo_rs`, o que sugere um total — a soma de DBT_CUSTO x DBT_QTDE é que reproduz o
-CBT_CUSTO do cabeçalho (740,10 contra 735,16 na batida 2173, diferença de
-arredondamento do TGC). O destino precisa multiplicar pela quantidade antes de somar.
+CBT_CUSTO do cabeçalho (diferença de centavos, arredondamento
+do TGC). O destino precisa multiplicar pela quantidade antes de somar.
 
 DIVERGÊNCIA medida contra o contrato (documentada, não corrigida em silêncio):
 `DBT_MS` é NULL em 8.484/8.484 — o contrato tipa MS_PCT como NUMERIC(6,2), mas esta
@@ -38,7 +38,7 @@ só é NULL em 5 linhas).
 
 Escalas: DBT_QTDEPREVISTA/DBT_QTDE/DBT_PREV_KGMSP/DBT_REAL_KGMSP/DBT_MS/DBT_CUSTO são
 BIGINT scale -4 e o driver firebirdsql devolve Decimal com a escala já aplicada
-(426.0000 kg, 18.6929 kg MS, 0.1907 R$/kg).
+(ex.: 410.0000 kg, 18.5000 kg MS, 0.2000 R$/kg).
 """
 from __future__ import annotations
 

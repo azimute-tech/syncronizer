@@ -9,7 +9,7 @@ from syncronizer.endpoints.controle_diario import ControleDiarioEndpoint
 def _row(**over):
     base = {
         "COD_LOTE": 10138, "DATA": date(2026, 8, 5), "TIPO": "REBANHO",
-        "CURRAL_NOME": "RMG-2",
+        "CURRAL_NOME": "C-2",
         "CABECAS": Decimal("50.000000"), "MORTES": Decimal("0.000000"),
         "DIAS_CONF_MEDIO": Decimal("66.000000"),
         "PESO_ENTRADA_MEDIO": Decimal("263.780000"),
@@ -28,7 +28,7 @@ def test_transform_shape_and_types():
     ep = ControleDiarioEndpoint()
     r = ep.transform(_row())
     assert r["COD_LOTE"] == "10138" and r["DATA"] == "2026-08-05" and r["TIPO"] == "REBANHO"
-    assert r["CURRAL_NOME"] == "RMG-2"
+    assert r["CURRAL_NOME"] == "C-2"
     assert r["CABECAS"] == 50 and isinstance(r["CABECAS"], int)
     assert r["MORTES"] == 0 and isinstance(r["MORTES"], int)
     assert r["DIAS_CONF_MEDIO"] == 66.0
@@ -55,7 +55,7 @@ def test_chave_e_a_identidade_de_negocio():
 
 
 def test_curral_e_o_nome_nunca_o_codigo():
-    """CNT_CURRAL é VARCHAR com o NOME do curral ("B-1", "RMG-2"), não o código.
+    """CNT_CURRAL é VARCHAR com o NOME do curral ("B-1", "C-2"), não o código.
     Viaja como CURRAL_NOME — o mesmo precedente de movimentacoes; chamar de
     COD_CURRAL repetiria o bug silencioso de join documentado em animais."""
     ep = ControleDiarioEndpoint()

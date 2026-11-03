@@ -41,7 +41,7 @@ DIVERGÊNCIAS medidas contra o contrato (documentadas, não corrigidas em silên
     `animais`).
 
 Escalas: todas as colunas de peso/valor/RC são BIGINT scale -2 e o driver firebirdsql
-devolve Decimal com a escala já aplicada (61612.00 kg, 53.25 %, 800598.32 R$).
+devolve Decimal com a escala já aplicada (ex.: 60000.00 kg, 53.33 %, 640000.00 R$).
 `CLS_FLAG_FECHADO` é CHAR(1) 'S'/'N' (26 'S' e 22 'N' na staging) e vira boolean.
 """
 from __future__ import annotations

@@ -1,9 +1,8 @@
 """TGC `insumos_baixas` endpoint — baixas avulsas de insumo (CAD_BAIXA_ALIM) para o AgroDB.
 
 Source: Firebird 2.5 `CAD_BAIXA_ALIM`, com o nome do centro de custo de
-        `CAD_CENTROCUSTO`. Na base de staging (20/10/2026): 115 baixas de 11 insumos,
-        13/04 a 15/10/2026, Σ 2.799.886,55 kg — CONSUMO 108 (1.949.006 kg), PERDA 3
-        (103.010,55 kg), SAIDA 4 (747.870 kg).
+        `CAD_CENTROCUSTO`. Na base de staging há os três tipos: CONSUMO (a maioria),
+        PERDA e SAIDA.
 Target: POST /api/integracoes/tgc/insumos-baixas  body {"baixas": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -11,8 +10,8 @@ Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id ve
 A baixa é a SAÍDA do estoque que não passa pela fábrica: consumo direto, perda,
 devolução/saída para outra fazenda, zeragem de silo. No Relatório de Insumos ela entra
 no SALDO (saldo = entradas − batidas − baixas, a conta da Posição do TGC) mas NÃO no
-ritmo de consumo — são ajustes pontuais: a baixa 73 é um "CONSUMO" de 1.893.339 kg num
-único dia (13/10) para zerar o silo "MILHO GRÃO UMIDO_T1 MENOR" (hoje encerrado:
+ritmo de consumo — são ajustes pontuais: há "CONSUMO" lançado num único dia para
+zerar um silo inteiro (silo hoje encerrado:
 `AA_REL_ESTOQUE_ATUAL = 'N'`). Roda depois do catálogo
 `alimentos` (order=20), que dá nome ao `COD_ALIMENTO` — zero baixas órfãs, conferido
 na staging —, logo depois das entradas (order=58).
@@ -22,16 +21,16 @@ mantém `CBA_DATA_UPDATE`, preenchida em 115/115) sem o `CBA_CODIGO` mudar; um
 watermark por código não veria a correção. ``reconcile_deletes`` fica False como nos
 demais feeds.
 
-Regra de zero: `QTDE_KG` 0 É dado real e viaja como 0.0 (1 baixa na staging: a 27,
-CONSUMO de 22/06). `TIPO` viaja como veio (CONSUMO | PERDA | SAIDA na staging).
+Regra de zero: `QTDE_KG` 0 É dado real e viaja como 0.0 (há baixa de CONSUMO com
+0 kg na staging). `TIPO` viaja como veio (CONSUMO | PERDA | SAIDA na staging).
 
 `CENTRO_CUSTO` vem por LEFT JOIN — um centro de custo apagado não pode sumir com o
-peso baixado (0 órfãos hoje; um só centro em uso, "AGROPEC VITÓRIA 2", em 115/115).
+peso baixado (0 órfãos hoje; um só centro de custo em uso, em todas as baixas).
 
 `OBS` (CBA_OBS) é BLOB SUB_TYPE TEXT em WIN1252. Medido: o driver firebirdsql devolve
 o BLOB de texto já como str — o servidor translitera para o charset da conexão (UTF8,
-o padrão do agente; conferido também com WIN1252) e o acento chega certo ("DEVOLUÇÃO
-DE MILHO PARA FAZENDA NASCENTE"). Preenchida em 3 das 115, com quebra de linha
+o padrão do agente; conferido também com WIN1252) e o acento chega certo (ç, ã, é).
+Preenchida em poucas baixas, com quebra de linha
 (CRLF) dentro do texto, que é preservada. Regra do contrato: trim, vazio -> None,
 truncada em 500 caracteres (texto livre do operador num BLOB sem limite; o maior hoje
 tem 83).

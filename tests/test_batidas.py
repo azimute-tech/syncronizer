@@ -13,11 +13,11 @@ from syncronizer.endpoints.batidas_itens import BatidasItensEndpoint
 def _batida(**over):
     base = {
         "COD_BATIDA": 2173, "COD_RACAO_PROD": 10068, "DATA": date(2026, 8, 13),
-        "QTDE_PREVISTA_KG": Decimal("1099.9700"),
-        "QTDE_REALIZADA_KG": Decimal("1088.0000"),
-        "QTD_CABECAS": None, "CUSTO_RS": Decimal("735.1644"),
+        "QTDE_PREVISTA_KG": Decimal("1000.0000"),
+        "QTDE_REALIZADA_KG": Decimal("990.0000"),
+        "QTD_CABECAS": None, "CUSTO_RS": Decimal("700.5000"),
         "HORA_INICIO": time(0, 0), "HORA_FIM": time(0, 0),
-        "OPERADOR": "PASEIRO", "MOTORISTA": None, "TIPO": "CONSUMO",
+        "OPERADOR": "OPERADOR 1", "MOTORISTA": None, "TIPO": "CONSUMO",
     }
     base.update(over)
     return base
@@ -29,9 +29,9 @@ def test_transform_shape_and_types():
     assert r["COD_BATIDA"] == "2173" and ep.make_pk(r) == "2173"
     assert r["COD_RACAO_PROD"] == "10068"
     assert r["DATA"] == "2026-08-13"
-    assert r["QTDE_PREVISTA_KG"] == 1099.97 and r["QTDE_REALIZADA_KG"] == 1088.0
-    assert r["CUSTO_RS"] == 735.1644 and isinstance(r["CUSTO_RS"], float)
-    assert r["OPERADOR"] == "PASEIRO" and r["TIPO"] == "CONSUMO"
+    assert r["QTDE_PREVISTA_KG"] == 1000.0 and r["QTDE_REALIZADA_KG"] == 990.0
+    assert r["CUSTO_RS"] == 700.5 and isinstance(r["CUSTO_RS"], float)
+    assert r["OPERADOR"] == "OPERADOR 1" and r["TIPO"] == "CONSUMO"
 
 
 def test_horas_viram_texto_hhmm():
@@ -103,10 +103,10 @@ def test_flag_fim_nao_e_usada_como_filtro():
 def _item(**over):
     base = {
         "COD_ITEM": 11746, "COD_BATIDA": 2173, "COD_ALIMENTO": 80013,
-        "DATA": date(2026, 8, 13), "PREVISTO_KG": Decimal("418.7300"),
-        "REALIZADO_KG": Decimal("426.0000"), "PREV_KG_MS": Decimal("18.0000"),
-        "REAL_KG_MS": Decimal("18.6929"), "MS_PCT": None,
-        "CUSTO_RS": Decimal("0.1907"),
+        "DATA": date(2026, 8, 13), "PREVISTO_KG": Decimal("400.0000"),
+        "REALIZADO_KG": Decimal("410.0000"), "PREV_KG_MS": Decimal("18.0000"),
+        "REAL_KG_MS": Decimal("18.5000"), "MS_PCT": None,
+        "CUSTO_RS": Decimal("0.2000"),
     }
     base.update(over)
     return base
@@ -118,11 +118,11 @@ def test_itens_transform_shape_and_types():
     assert r["COD_ITEM"] == "11746" and ep.make_pk(r) == "11746"
     assert r["COD_BATIDA"] == "2173" and r["COD_ALIMENTO"] == "80013"
     assert r["DATA"] == "2026-08-13"
-    assert r["PREVISTO_KG"] == 418.73 and r["REALIZADO_KG"] == 426.0
-    assert r["PREV_KG_MS"] == 18.0 and r["REAL_KG_MS"] == 18.6929
+    assert r["PREVISTO_KG"] == 400.0 and r["REALIZADO_KG"] == 410.0
+    assert r["PREV_KG_MS"] == 18.0 and r["REAL_KG_MS"] == 18.5
     # DBT_CUSTO é o custo UNITÁRIO do alimento (R$/kg), não o total da linha:
     # SUM(DBT_CUSTO x DBT_QTDE) é que reproduz o CBT_CUSTO do cabeçalho.
-    assert r["CUSTO_RS"] == 0.1907
+    assert r["CUSTO_RS"] == 0.2
 
 
 def test_itens_kg_zero_e_dado_real_mas_custo_zero_vira_none():

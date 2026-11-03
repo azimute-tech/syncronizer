@@ -14,11 +14,11 @@ def _lote(**over):
     base = {
         "COD_LOTE_SAIDA": 3, "COD_DESTINO": 6,
         "DATA_ABATE": date(2026, 5, 5), "DATA_EMBARQUE": date(2026, 5, 4),
-        "QTD_CABECAS": 110, "CONF_PESO_KG": Decimal("62121.00"), "CONF_QTD_CAB": 110,
+        "QTD_CABECAS": 110, "CONF_PESO_KG": Decimal("60000.00"), "CONF_QTD_CAB": 110,
         "PORT_PESO_KG": Decimal("0.00"), "FRIG_PESO_KG": Decimal("0.00"),
-        "FRIG_QTD_CAB": 0, "KG_TOTAL_CARCACA": Decimal("33346.55"),
-        "TOTAL_ARROBA": Decimal("2223.10"), "RC_PCT": Decimal("53.68"),
-        "VALOR_BRUTO": Decimal("770507.66"), "VALOR_LIQUIDO": Decimal("770507.66"),
+        "FRIG_QTD_CAB": 0, "KG_TOTAL_CARCACA": Decimal("32000.50"),
+        "TOTAL_ARROBA": Decimal("2133.37"), "RC_PCT": Decimal("53.33"),
+        "VALOR_BRUTO": Decimal("640000.00"), "VALOR_LIQUIDO": Decimal("640000.00"),
         "VALOR_IMPOSTOS": Decimal("0.00"), "NUMERO_NF": None,
         "VALOR_NF": Decimal("0.00"), "DATA_PAGTO_PREV": None, "DATA_PAGTO_PAGO": None,
         "CUSTO_DIARIA": Decimal("0.00"), "NUM_CONTRATO": None, "FECHADO": "S",
@@ -34,8 +34,8 @@ def test_transform_shape_and_types():
     assert r["COD_DESTINO"] == "6"
     assert r["DATA_ABATE"] == "2026-05-05" and r["DATA_EMBARQUE"] == "2026-05-04"
     assert r["QTD_CABECAS"] == 110 and isinstance(r["QTD_CABECAS"], int)
-    assert r["CONF_PESO_KG"] == 62121.0 and r["KG_TOTAL_CARCACA"] == 33346.55
-    assert r["RC_PCT"] == 53.68 and r["VALOR_BRUTO"] == 770507.66
+    assert r["CONF_PESO_KG"] == 60000.0 and r["KG_TOTAL_CARCACA"] == 32000.5
+    assert r["RC_PCT"] == 53.33 and r["VALOR_BRUTO"] == 640000.0
 
 
 def test_valores_zerados_do_tgc_viram_none():
@@ -97,13 +97,13 @@ def _custo(**over):
 
 def test_custos_transform_shape():
     ep = LotesSaidaCustosEndpoint()
-    r = ep.transform(_custo(VALOR=Decimal("770507.66"),
+    r = ep.transform(_custo(VALOR=Decimal("640000.00"),
                             PORC_VALOR=Decimal("100.00"),
                             DESCRICAO="VENDA ANIMAIS"))
     assert r["COD_CUSTO"] == "1777" and ep.make_pk(r) == "1777"
     assert r["COD_LOTE_SAIDA"] == "3"
     assert r["DESCRICAO"] == "VENDA ANIMAIS"
-    assert r["VALOR"] == 770507.66
+    assert r["VALOR"] == 640000.0
     assert r["STATUS"] == "R"               # CHAR(1) 'R'/'D', não 'S'/'N'
     assert r["PORC_VALOR"] == 100.0
     assert r["IMPOSTO"] is False

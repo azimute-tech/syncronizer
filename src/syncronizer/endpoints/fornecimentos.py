@@ -31,8 +31,8 @@ previsto e não fornecido) e viaja como 0.0. Já `CFORN_CUSTO` 0,0000 (1.838 lin
 falso de R$ 0/kg (mesmo racional do VALOR_ENTRADA em `animais`).
 
 Escalas: PREVISTO/REALIZADO/SOBRACOCHO/MSRACAO/CUSTO são BIGINT scale -4; o driver
-firebirdsql devolve Decimal já com a escala aplicada (252.0691 kg, 56.8620 %MS,
-0.5679 R$/kg — conferido na base real).
+firebirdsql devolve Decimal já com a escala aplicada (ex.: 250.0500 kg, 55.5000 %MS,
+0.6000 R$/kg).
 
 COD_RACAO_PROD (`CFORN_CODRACAOPROD`, ago/2026) — a dieta que o trato entregou, para o
 corte por dieta no relatório de Tratos. Aponta para `racoes_tgc.cod_racao_prod`

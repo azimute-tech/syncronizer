@@ -15,8 +15,8 @@ def _row(**over):
     base = {
         "COD_PESAGEM": 46872, "COD_ANIMAL": 2400, "TIPO": "SAIDA",
         "DATA": date(2026, 7, 28), "PESO_KG": Decimal("450.00"),
-        "CARCACA_KG": Decimal("239.6422"), "ARROBAS": Decimal("15.9761"),
-        "RENDIMENTO_PCT": Decimal("53.25"), "CLASSIFICACAO": None,
+        "CARCACA_KG": Decimal("240.0000"), "ARROBAS": Decimal("16.0000"),
+        "RENDIMENTO_PCT": Decimal("53.33"), "CLASSIFICACAO": None,
         "DENTICAO": None, "GORDURA": None, "SCORE": None, "HORAS_JEJUM": None,
     }
     base.update(over)
@@ -31,8 +31,8 @@ def test_transform_shape_and_types():
     assert r["TIPO"] == "SAIDA"
     assert r["DATA"] == "2026-07-28"
     assert r["PESO_KG"] == 450.0 and isinstance(r["PESO_KG"], float)
-    assert r["CARCACA_KG"] == 239.6422 and r["ARROBAS"] == 15.9761
-    assert r["RENDIMENTO_PCT"] == 53.25
+    assert r["CARCACA_KG"] == 240.0 and r["ARROBAS"] == 16.0
+    assert r["RENDIMENTO_PCT"] == 53.33
 
 
 def test_carcaca_e_arroba_zero_viram_none_juntas():

@@ -29,7 +29,7 @@ Contract v2 (jul/2026) — what changed against the first version:
     for exactly that). Do not "unify" the two.
 
 VALOR_ENTRADA (`CA_VALORENT`, ago/2026) — campo estrutural para o fallback de custo do
-animal no AgroDB. Em Birigui ele vem hoje 0/NULL (verificado no backup real: 0% das
+animal no AgroDB. Na fazenda de referência ele vem hoje 0/NULL (verificado no backup real: 0% das
 linhas preenchidas), mas o espelho precisa da coluna pronta para quando a fazenda
 passar a preencher — sem ela o dado novo seria descartado em silêncio. O 0,00 é o
 default intocado do TGC para "não informado" (mesmo racional do bloco de saída:

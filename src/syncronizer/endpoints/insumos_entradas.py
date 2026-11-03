@@ -2,10 +2,8 @@
 
 Source: Firebird 2.5 `DET_ITENS_NFINSUMOS` (o insumo, o peso recebido e o valor) x
         `CAD_NFINSUMOS` (cabeçalho do recebimento: NF, datas, placa), com o fornecedor
-        resolvido por `CAD_COMPRAINSUMOS` -> `CAD_FORNECEDOR`. Na base de staging
-        (20/10/2026): 361 cabeçalhos com exatamente 1 item cada — o "item" É a carga,
-        um caminhão —, 18 insumos, 23 fornecedores, recebimentos de 04/01 a 15/10/2026,
-        Σ 33.032.225,32 kg.
+        resolvido por `CAD_COMPRAINSUMOS` -> `CAD_FORNECEDOR`. Na base de staging todo
+        cabeçalho tem exatamente 1 item — o "item" É a carga, um caminhão.
 Target: POST /api/integracoes/tgc/insumos-entradas  body {"entradas": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -27,12 +25,12 @@ False como nos demais feeds.
 Datas — a data da ENTRADA no estoque do AgroDB é o RECEBIMENTO (`CNFI_DATA_REC`,
 decisão de 20/10/2026), não a da NF (`CNFI_DATAEMISSAO`) nem a "data de entrega"
 (`CNFI_DATAENTREGA`) que a Posição do TGC usa. As três viajam; o destino escolhe.
-`CNFI_DATA_REC` ≠ `CNFI_DATAENTREGA` em 16 das 361 cargas (a NF 115 de silagem foi
-emitida em 07/07 e recebida em 07/08). Nenhuma das duas é NULL na staging.
+`CNFI_DATA_REC` ≠ `CNFI_DATAENTREGA` em 16 das 361 cargas (há NF de silagem
+recebida um mês depois de emitida). Nenhuma das duas é NULL na staging.
 
 `LANCADA_ESTOQUE` = `DNFI_FLAG_CONTAB = 'S'` — o mesmo predicado da Posição do TGC
-(NULL ou 'N' são False). 1 carga na staging não está lançada (DNFI_CODIGO 1125,
-46.740 kg recebidos em 15/10, sem `DNFI_DATA_CONTAB`): ela CONTA no saldo do AgroDB,
+(NULL ou 'N' são False). 1 carga na staging não está lançada (recebida e
+ainda sem `DNFI_DATA_CONTAB`): ela CONTA no saldo do AgroDB,
 que a sinaliza na tela — por isso viaja como qualquer outra, sem filtro na origem.
 
 Regra de zero (contrato, seção 12):
@@ -51,14 +49,14 @@ Regra de zero (contrato, seção 12):
     seria descartado em silêncio.
 
 ARMADILHAS medidas na staging:
-  * `VALOR_UNIT_RS_T` é R$ por TONELADA RECEBIDA, não por kg: 1.002,12 para 75.400 kg
-    recebidos e R$ 75.560,00 (= 75.560 / 75,4 t). Confere em 361/361 cargas como
+  * `VALOR_UNIT_RS_T` é R$ por TONELADA RECEBIDA, não por kg: ex.: 1.004,00 para 50.000 kg
+    recebidos e R$ 50.200,00 (= 50.200 / 50 t). Confere em 361/361 cargas como
     valor_total ÷ kg recebido × 1000 (pelo peso da NF, só 150). O nome do campo
     carrega a unidade para ninguém multiplicar por kg.
   * kg recebido ≠ kg da NF (`PESO_NF_KG`) em 212 das 361 cargas — é a quebra de
     transporte, informação legítima; o saldo usa SEMPRE o recebido.
-  * `NUMERO_NF` é texto livre: 44 cargas não são um número ("1872-1877" para uma carga
-    de várias NFs, "FAKE2", "NOTA FAKE", "EMPRESTIMO", ",304"). Os "FAKE" são
+  * `NUMERO_NF` é texto livre: 44 cargas não são um número (faixa "1001-1003" para uma
+    carga de várias NFs, palavras no lugar do número, números com vírgula). As palavras são
     lançamentos de ajuste de estoque do operador e entram no saldo do TGC — viajam como
     estão. `SERIE_NF` está vazia em todas (279 '' e 82 NULL) e vira None.
   * `CNFI_HORA_REC` é TIME -> texto `HH:MM` (como `batidas`): segundos são cortados
@@ -71,12 +69,12 @@ ARMADILHAS medidas na staging:
   * `DNFI_FLAG_ESTOQUE` é 'S' em 361/361 e não entra: o predicado de "lançada" do TGC
     é o `DNFI_FLAG_CONTAB`.
   * Texto: CHAR/VARCHAR em WIN1252 na origem; com `charset = UTF8` (o padrão do
-    agente) o servidor translitera e o driver devolve str ("JS GRÃOS ARMAZÉNS GERAIS
-    LTDA"). Conferido também com WIN1252.
+    agente) o servidor translitera e o driver devolve str (nome de
+    fornecedor com Ã e É chega certo). Conferido também com WIN1252.
 
 Escalas: DNFI_QTDEENTREGUE/DNFI_PESOTICKETFORN/DNFI_VALORUN/DNFI_VALORTOTAL/DNFI_UMIDADE/
 DNFI_IMPUREZA são BIGINT scale -2 e o driver firebirdsql devolve Decimal com a escala já
-aplicada (75400.00 kg, 1002.12 R$/t, 11.00 %).
+aplicada (ex.: 50000.00 kg, 1004.00 R$/t, 11.00 %).
 """
 from __future__ import annotations
 
@@ -163,7 +161,7 @@ class InsumosEntradasEndpoint(BatchEndpoint):
             "COD_COMPRA": opt_code(row.get("COD_COMPRA")),
             # join com alimentos_tgc.cod_alimento (AA_CODIGO)
             "COD_ALIMENTO": opt_code(row.get("COD_ALIMENTO")),
-            # texto livre: "1872-1877", "FAKE2"... — nunca converter para número
+            # texto livre: "1001-1003", "AJUSTE"... — nunca converter para número
             "NUMERO_NF": opt_str(row.get("NUMERO_NF")),
             "SERIE_NF": opt_str(row.get("SERIE_NF")),
             "DATA_EMISSAO": iso_date(row.get("DATA_EMISSAO")),

@@ -12,7 +12,7 @@ por animal x dia x lote x ração) e é a soma delas que todo fechamento do TGC 
 (`PROC_RESULTADO_INDIVIDUAL`, `PROC_ANALISE_LT_SAIDA`). O AgroDB refazia a conta a
 partir do trato do lote, em partes iguais; o TGC rateia pelo PESO PROJETADO do animal
 e registra o lote do dia por fotografia. As duas contas batem na média e divergem ~3%
-por animal. Decisão do Nelson (01/10/2026): consumo individual é dado operacional do
+por animal. Decisão do sócio (01/10/2026): consumo individual é dado operacional do
 TGC e passa a vir dele. Estudo: AgroDB `docs/relatorios/estudo-tgc/`.
 
 GRÃO animal x lote, não animal x dia: o grão diário tem 886 mil linhas e cresce ~6,7

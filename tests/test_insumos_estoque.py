@@ -16,17 +16,17 @@ from syncronizer.endpoints.insumos_entradas import InsumosEntradasEndpoint
 
 
 def _entrada(**over):
-    # carga 909 da staging (milho grão úmido), com ticket da fazenda e umidade/impureza
+    # carga sintética no formato da staging, com ticket da fazenda e umidade/impureza
     base = {
         "COD_ENTRADA": 909, "COD_NF": 881, "COD_COMPRA": 37, "COD_ALIMENTO": 80026,
         "NUMERO_NF": "185", "SERIE_NF": "",
         "DATA_EMISSAO": date(2026, 7, 2), "DATA_ENTREGA": date(2026, 7, 3),
         "DATA_RECEBIMENTO": date(2026, 7, 3), "HORA_RECEBIMENTO": time(10, 0),
         "DATA_LANCAMENTO": date(2026, 7, 20), "LANCADA_ESTOQUE": "S",
-        "FORNECEDOR": "AGROWIRRIS COMERCIO E INDUSTRIA LTDA", "PLACA": "",
+        "FORNECEDOR": "FORNECEDOR EXEMPLO LTDA", "PLACA": "",
         "TICKET_FAZENDA": 811,
-        "QTDE_KG": Decimal("75400.00"), "PESO_NF_KG": Decimal("75560.00"),
-        "VALOR_UNIT_RS_T": Decimal("1002.12"), "VALOR_TOTAL_RS": Decimal("75560.00"),
+        "QTDE_KG": Decimal("50000.00"), "PESO_NF_KG": Decimal("50200.00"),
+        "VALOR_UNIT_RS_T": Decimal("1004.00"), "VALOR_TOTAL_RS": Decimal("50200.00"),
         "UMIDADE_PCT": Decimal("11.00"), "IMPUREZA_PCT": Decimal("0.90"),
     }
     base.update(over)
@@ -56,10 +56,10 @@ def test_entradas_transform_shape_and_types():
     assert r["DATA_EMISSAO"] == "2026-07-02" and r["DATA_ENTREGA"] == "2026-07-03"
     assert r["DATA_RECEBIMENTO"] == "2026-07-03" and r["HORA_RECEBIMENTO"] == "10:00"
     assert r["DATA_LANCAMENTO"] == "2026-07-20" and r["LANCADA_ESTOQUE"] is True
-    assert r["QTDE_KG"] == 75400.0 and isinstance(r["QTDE_KG"], float)
-    assert r["PESO_NF_KG"] == 75560.0
+    assert r["QTDE_KG"] == 50000.0 and isinstance(r["QTDE_KG"], float)
+    assert r["PESO_NF_KG"] == 50200.0
     # R$ por TONELADA recebida: 75.560 / 75,4 t
-    assert r["VALOR_UNIT_RS_T"] == 1002.12 and r["VALOR_TOTAL_RS"] == 75560.0
+    assert r["VALOR_UNIT_RS_T"] == 1004.0 and r["VALOR_TOTAL_RS"] == 50200.0
     assert r["UMIDADE_PCT"] == 11.0 and r["IMPUREZA_PCT"] == 0.9
 
 
@@ -108,7 +108,7 @@ def test_entradas_hora_recebimento_vira_hhmm():
 def test_entradas_numero_nf_e_texto():
     """CNFI_NUMERO é texto livre: 44 cargas da staging não são um número."""
     ep = InsumosEntradasEndpoint()
-    for numero in ("1872-1877", "FAKE2", "NOTA FAKE", ",304", "115"):
+    for numero in ("1001-1003", "AJUSTE2", "NOTA AJUSTE", ",123", "100"):
         assert ep.transform(_entrada(NUMERO_NF=numero))["NUMERO_NF"] == numero
 
 
@@ -125,9 +125,9 @@ def test_entradas_vazios_viram_none():
 
 def test_entradas_texto_com_acento_sobrevive_ao_json():
     ep = InsumosEntradasEndpoint()
-    r = ep.transform(_entrada(FORNECEDOR="JS GRÃOS ARMAZÉNS GERAIS LTDA"))
-    assert r["FORNECEDOR"] == "JS GRÃOS ARMAZÉNS GERAIS LTDA"
-    assert json.loads(json.dumps(r))["FORNECEDOR"] == "JS GRÃOS ARMAZÉNS GERAIS LTDA"
+    r = ep.transform(_entrada(FORNECEDOR="ARMAZÉM DE GRÃOS EXEMPLO LTDA"))
+    assert r["FORNECEDOR"] == "ARMAZÉM DE GRÃOS EXEMPLO LTDA"
+    assert json.loads(json.dumps(r))["FORNECEDOR"] == "ARMAZÉM DE GRÃOS EXEMPLO LTDA"
     assert ep.transform(_entrada(FORNECEDOR=None))["FORNECEDOR"] is None
 
 
@@ -152,9 +152,9 @@ def test_entradas_extract_spec_full_scan_com_joins():
 def _baixa(**over):
     base = {
         "COD_BAIXA": 39, "COD_ALIMENTO": 80026, "DATA": date(2026, 8, 27),
-        "QTDE_KG": Decimal("601300.0000"), "TIPO": "SAIDA",
-        "CENTRO_CUSTO": "AGROPEC VITÓRIA 2",
-        "OBS": "DEVOLUÇÃO DE MILHO PARA FAZENDA NASCENTE",
+        "QTDE_KG": Decimal("500000.0000"), "TIPO": "SAIDA",
+        "CENTRO_CUSTO": "CENTRO DE CUSTO Nº 2",
+        "OBS": "DEVOLUÇÃO DE MILHO PARA OUTRA FAZENDA",
     }
     base.update(over)
     return base
@@ -171,14 +171,14 @@ def test_baixas_transform_shape_and_types():
     r = ep.transform(_baixa())
     assert r["COD_BAIXA"] == "39" and ep.make_pk(r) == "39"
     assert r["COD_ALIMENTO"] == "80026" and r["DATA"] == "2026-08-27"
-    assert r["QTDE_KG"] == 601300.0 and isinstance(r["QTDE_KG"], float)
+    assert r["QTDE_KG"] == 500000.0 and isinstance(r["QTDE_KG"], float)
     assert r["TIPO"] == "SAIDA"
-    assert r["CENTRO_CUSTO"] == "AGROPEC VITÓRIA 2"
-    assert r["OBS"] == "DEVOLUÇÃO DE MILHO PARA FAZENDA NASCENTE"
+    assert r["CENTRO_CUSTO"] == "CENTRO DE CUSTO Nº 2"
+    assert r["OBS"] == "DEVOLUÇÃO DE MILHO PARA OUTRA FAZENDA"
 
 
 def test_baixas_qtde_zero_e_dado_real():
-    """A baixa 27 da staging é um CONSUMO de 0 kg — viaja como 0.0."""
+    """Há CONSUMO de 0 kg na staging — viaja como 0.0."""
     assert InsumosBaixasEndpoint().transform(_baixa(QTDE_KG=Decimal("0.0000")))["QTDE_KG"] == 0.0
 
 

@@ -10,9 +10,9 @@ def _row(**over):
     base = {
         "COD_FORNECIMENTO": 41021, "DATA": date(2026, 8, 5),
         "COD_LOTE": 10132, "COD_CURRAL": 252, "COD_RACAO_PROD": 10023, "TRATO": 4,
-        "PREVISTO_KG": Decimal("252.0691"), "REALIZADO_KG": Decimal("290.0000"),
+        "PREVISTO_KG": Decimal("250.0500"), "REALIZADO_KG": Decimal("280.0000"),
         "SOBRA_KG": Decimal("0.0000"), "QTD_CABECAS": 108,
-        "MS_PCT": Decimal("56.8620"), "CUSTO_KG_MN": Decimal("0.5679"),
+        "MS_PCT": Decimal("55.5000"), "CUSTO_KG_MN": Decimal("0.6000"),
     }
     base.update(over)
     return base
@@ -25,11 +25,11 @@ def test_transform_shape_and_types():
     assert r["DATA"] == "2026-08-05"
     assert r["COD_LOTE"] == "10132" and r["COD_CURRAL"] == "252"
     assert r["TRATO"] == 4 and isinstance(r["TRATO"], int)
-    assert r["PREVISTO_KG"] == 252.0691 and isinstance(r["PREVISTO_KG"], float)
-    assert r["REALIZADO_KG"] == 290.0
+    assert r["PREVISTO_KG"] == 250.05 and isinstance(r["PREVISTO_KG"], float)
+    assert r["REALIZADO_KG"] == 280.0
     assert r["QTD_CABECAS"] == 108 and isinstance(r["QTD_CABECAS"], int)
-    assert r["MS_PCT"] == 56.862
-    assert r["CUSTO_KG_MN"] == 0.5679
+    assert r["MS_PCT"] == 55.5
+    assert r["CUSTO_KG_MN"] == 0.6
 
 
 def test_kg_zero_e_dado_real_mas_custo_zero_vira_none():
@@ -43,7 +43,7 @@ def test_kg_zero_e_dado_real_mas_custo_zero_vira_none():
     assert r["CUSTO_KG_MN"] is None                              # não informado
     assert ep.transform(_row(CUSTO_KG_MN=None))["CUSTO_KG_MN"] is None
     # custo preenchido viaja como float
-    assert ep.transform(_row(CUSTO_KG_MN=Decimal("0.5679")))["CUSTO_KG_MN"] == 0.5679
+    assert ep.transform(_row(CUSTO_KG_MN=Decimal("0.6000")))["CUSTO_KG_MN"] == 0.6
 
 
 def test_data_e_do_fornecimento_nunca_a_de_registro():

@@ -10,8 +10,8 @@ POR QUE EXISTE — o feed `curvas` espelha o CATÁLOGO (`DET_GMDPROJETADO`, por 
 categoria). O TGC não projeta por ele: na criação do lote a curva é copiada para
 `DET_GMDPROJ_LOTE` (`CAD_LOTE_CRIAGMD`) e é essa cópia que entra no peso projetado
 (`CNT_PESO_MEDIO_ATUAL`, `DACRES_PESO_MED_CLI`). O catálogo pode ser editado depois sem
-mexer nos lotes — no backup de 09/09/2026 ele está inteiro em 1,35 kg/dia (3.270
-linhas, um único valor) e os lotes seguem com 42 valores distintos de GMD. Projetar
+mexer nos lotes — no backup de 09/09/2026 o catálogo tem um único valor de GMD e os lotes seguem com
+dezenas de valores distintos. Projetar
 pelo catálogo deixava o AgroDB ~5% abaixo do TGC em todo lote.
 
 Roda logo depois de `lotes` (order=21).

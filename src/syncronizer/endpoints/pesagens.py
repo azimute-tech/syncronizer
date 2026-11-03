@@ -17,9 +17,9 @@ AgroDB, que sai da conferência/O.C. (regra de ouro do módulo).
 FULL SCAN + row_hash — decisão deliberada CONTRA a linha "Incremental por DP_CODIGO
 (append-only na prática)" do contrato, porque a base real desmente a premissa. Medido
 na staging: 9.011 das 12.576 linhas (72%) têm `DP_DATA_UPDATE` POSTERIOR a
-`DP_DATAREG`, em blocos espalhados por dezenas de dias — 1.145 em 09/07, 1.021 em
-14/07 (estas TODAS do tipo SAIDA, ou seja, exatamente a carcaça/RC de que o
-fechamento depende), 863 em 12/06, 792 em 11/06. Nenhuma dessas correções mudaria o
+`DP_DATAREG`, em blocos espalhados por dezenas de dias, de centenas a mais de mil linhas no mesmo
+dia (os maiores TODOS do tipo SAIDA, ou seja, exatamente a carcaça/RC de que o
+fechamento depende). Nenhuma dessas correções mudaria o
 `DP_CODIGO`, então um watermark pela PK não veria nenhuma delas e o valor errado
 ficaria congelado no espelho para sempre, EM SILÊNCIO. É o mesmo critério que já leva
 `fornecimentos` e `leituras_cocho` a pagar o scan completo, e o custo aqui é da mesma
@@ -52,8 +52,8 @@ de 100 é impossível), e essas linhas viajam assim mesmo para o destino enxerga
 problema. A correção acontece no TGC e o ``row_hash`` re-envia a linha corrigida.
 
 Escalas (o driver firebirdsql já aplica): DP_PESO/DP_RENDIMENTO/DP_HORASJEJUM são
-BIGINT scale -2 (450.00 kg, 53.25 %, horas); DP_CARCACA/DP_ARROBA são scale -4
-(239.6422 kg, 15.9761 @).
+BIGINT scale -2 (450.00 kg, 53.33 %, horas); DP_CARCACA/DP_ARROBA são scale -4
+(240.0000 kg, 16.0000 @).
 """
 from __future__ import annotations
 
