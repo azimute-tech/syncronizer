@@ -1,5 +1,5 @@
-"""Testes dos feeds do fechamento de abate: `lotes_saida` (CAD_LOTESAIDA, 48 linhas na
-staging) e `lotes_saida_custos` (DET_LOTESAIDA_FIN, 576 linhas).
+"""Testes dos feeds do fechamento de abate: `lotes_saida` (CAD_LOTESAIDA, dezenas de
+linhas na staging) e `lotes_saida_custos` (DET_LOTESAIDA_FIN, centenas de linhas).
 """
 import json
 from datetime import date
@@ -14,11 +14,11 @@ def _lote(**over):
     base = {
         "COD_LOTE_SAIDA": 3, "COD_DESTINO": 6,
         "DATA_ABATE": date(2026, 5, 5), "DATA_EMBARQUE": date(2026, 5, 4),
-        "QTD_CABECAS": 110, "CONF_PESO_KG": Decimal("62121.00"), "CONF_QTD_CAB": 110,
+        "QTD_CABECAS": 110, "CONF_PESO_KG": Decimal("60000.00"), "CONF_QTD_CAB": 110,
         "PORT_PESO_KG": Decimal("0.00"), "FRIG_PESO_KG": Decimal("0.00"),
-        "FRIG_QTD_CAB": 0, "KG_TOTAL_CARCACA": Decimal("33346.55"),
-        "TOTAL_ARROBA": Decimal("2223.10"), "RC_PCT": Decimal("53.68"),
-        "VALOR_BRUTO": Decimal("770507.66"), "VALOR_LIQUIDO": Decimal("770507.66"),
+        "FRIG_QTD_CAB": 0, "KG_TOTAL_CARCACA": Decimal("32000.50"),
+        "TOTAL_ARROBA": Decimal("2133.37"), "RC_PCT": Decimal("53.33"),
+        "VALOR_BRUTO": Decimal("640000.00"), "VALOR_LIQUIDO": Decimal("640000.00"),
         "VALOR_IMPOSTOS": Decimal("0.00"), "NUMERO_NF": None,
         "VALOR_NF": Decimal("0.00"), "DATA_PAGTO_PREV": None, "DATA_PAGTO_PAGO": None,
         "CUSTO_DIARIA": Decimal("0.00"), "NUM_CONTRATO": None, "FECHADO": "S",
@@ -34,13 +34,13 @@ def test_transform_shape_and_types():
     assert r["COD_DESTINO"] == "6"
     assert r["DATA_ABATE"] == "2026-05-05" and r["DATA_EMBARQUE"] == "2026-05-04"
     assert r["QTD_CABECAS"] == 110 and isinstance(r["QTD_CABECAS"], int)
-    assert r["CONF_PESO_KG"] == 62121.0 and r["KG_TOTAL_CARCACA"] == 33346.55
-    assert r["RC_PCT"] == 53.68 and r["VALOR_BRUTO"] == 770507.66
+    assert r["CONF_PESO_KG"] == 60000.0 and r["KG_TOTAL_CARCACA"] == 32000.5
+    assert r["RC_PCT"] == 53.33 and r["VALOR_BRUTO"] == 640000.0
 
 
 def test_valores_zerados_do_tgc_viram_none():
-    """Na staging CLS_VALOR_IMPOSTOS, CLS_VALOR_NF e CLS_CUSTODIARIA são 0,00 em 48/48
-    e CLS_VALORBRUTO/LIQUIDO em 6/48: é o default "não informado" do TGC. Encaminhar 0
+    """Na staging CLS_VALOR_IMPOSTOS, CLS_VALOR_NF e CLS_CUSTODIARIA são 0,00 em todas
+    e CLS_VALORBRUTO/LIQUIDO em poucas: é o default "não informado" do TGC. Encaminhar 0
     plantaria receita falsa de R$ 0 num campo que o relatório usa como FALLBACK do
     romaneio do AgroDB."""
     r = LotesSaidaEndpoint().transform(
@@ -51,10 +51,10 @@ def test_valores_zerados_do_tgc_viram_none():
 
 
 def test_peso_frigorifico_zero_vira_none_mas_os_outros_pesos_nao():
-    """Exceção explícita do contrato: FRIG_PESO_KG 0 é "comum" e vira None (48/48 na
+    """Exceção explícita do contrato: FRIG_PESO_KG 0 é "comum" e vira None (em toda a
     staging). CONF_PESO_KG e PORT_PESO_KG são pesos e 0 viaja como dado real — mesmo
-    que PORT_PESO_KG esteja 0 em 44/48 (divergência documentada no módulo: estender a
-    regra a ele é decisão do contrato, não deste transform)."""
+    que PORT_PESO_KG esteja 0 em quase todas (divergência documentada no módulo:
+    estender a regra a ele é decisão do contrato, não deste transform)."""
     r = LotesSaidaEndpoint().transform(_lote(CONF_PESO_KG=Decimal("0.00")))
     assert r["FRIG_PESO_KG"] is None
     assert r["PORT_PESO_KG"] == 0.0
@@ -97,21 +97,21 @@ def _custo(**over):
 
 def test_custos_transform_shape():
     ep = LotesSaidaCustosEndpoint()
-    r = ep.transform(_custo(VALOR=Decimal("770507.66"),
+    r = ep.transform(_custo(VALOR=Decimal("640000.00"),
                             PORC_VALOR=Decimal("100.00"),
                             DESCRICAO="VENDA ANIMAIS"))
     assert r["COD_CUSTO"] == "1777" and ep.make_pk(r) == "1777"
     assert r["COD_LOTE_SAIDA"] == "3"
     assert r["DESCRICAO"] == "VENDA ANIMAIS"
-    assert r["VALOR"] == 770507.66
+    assert r["VALOR"] == 640000.0
     assert r["STATUS"] == "R"               # CHAR(1) 'R'/'D', não 'S'/'N'
     assert r["PORC_VALOR"] == 100.0
     assert r["IMPOSTO"] is False
 
 
 def test_rubrica_do_template_nao_lancada_vira_none():
-    """DET_LOTESAIDA_FIN é um template de 12 rubricas por lote (12 x 48 = 576). Na
-    staging só VENDA ANIMAIS está preenchida: 534 linhas têm 0,00. Mandá-las como R$
+    """DET_LOTESAIDA_FIN é um template de 12 rubricas por lote (lotes x 12 = linhas). Na
+    staging só VENDA ANIMAIS está preenchida: as demais têm 0,00. Mandá-las como R$
     0,00 afirmaria "não houve comissão/ICMS/FUNRURAL" em vez de "não foi informado"."""
     r = LotesSaidaCustosEndpoint().transform(_custo())
     assert r["VALOR"] is None

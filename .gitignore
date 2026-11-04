@@ -8,6 +8,9 @@ config.toml
 *.db-wal
 *.db-shm
 *.fdb
+*.fbk
+*.fbk.gz
+*.fbk.xz
 *.log
 
 # local dev data dir (SYNCRONIZER_DATA_DIR=./data)

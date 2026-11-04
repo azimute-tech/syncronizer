@@ -1,7 +1,7 @@
 """TGC `racoes` endpoint — catálogo de rações produzidas (CAD_RACAO_PROD + CAD_RACAO).
 
-Source: Firebird 2.5 `CAD_RACAO_PROD` (47 linhas na base de staging) com join em
-        `CAD_RACAO` (47 linhas) só para trazer o NOME.
+Source: Firebird 2.5 `CAD_RACAO_PROD` (dezenas de linhas na base de staging) com
+        join em `CAD_RACAO` só para trazer o NOME.
 Target: POST /api/integracoes/tgc/racoes  body {"racoes": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -26,13 +26,13 @@ versão apontando para uma fórmula inexistente deve viajar com NOME nulo para o
 enxergar a falha, em vez de a linha sumir (na staging não há nenhuma, mas a garantia é
 estrutural).
 
-FULL SCAN + row_hash — 47 linhas, e o nome da fórmula é editável (renomear a dieta
-tem que refletir no relatório). Não há coluna de watermark útil e um watermark por
-`CRP_CODIGO` congelaria o nome. Mesmo critério de `currais` e `metas_abate`.
+FULL SCAN + row_hash — dezenas de linhas, e o nome da fórmula é editável (renomear
+a dieta tem que refletir no relatório). Não há coluna de watermark útil e um watermark
+por `CRP_CODIGO` congelaria o nome. Mesmo critério de `currais` e `metas_abate`.
 ``reconcile_deletes`` fica False como nos demais feeds: uma ração sai de circulação
 virando `CRP_STATUS = 'I'`, não sendo deletada — e a desativação viaja no payload.
 
-`CRP_STATUS` é CHAR(1) 'A'/'I' (ativo/inativo — 3 'A' e 44 'I' na staging), NÃO o
+`CRP_STATUS` é CHAR(1) 'A'/'I' (ativo/inativo — os dois aparecem na staging), NÃO o
 'S'/'N' de flag booleana dos outros feeds, então viaja como texto via ``opt_str`` em
 vez de virar boolean. Confundir os dois transformaria toda ração ativa em False.
 """
@@ -54,13 +54,13 @@ class RacoesEndpoint(BatchEndpoint):
     api_path = "/api/integracoes/tgc/racoes"
     api_method = "POST"
 
-    # Full scan + row_hash: 47 linhas, e renomear a dieta precisa re-enviar.
+    # Full scan + row_hash: dezenas de linhas, e renomear a dieta precisa re-enviar.
     incremental_column = None
     reconcile_deletes = False        # desativação viaja como STATUS='I' — ver docstring
 
     payload_key = "racoes"
     record_key = "COD_RACAO_PROD"
-    error_key = "cod_racao_prod"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

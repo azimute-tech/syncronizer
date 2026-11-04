@@ -1,6 +1,6 @@
 """TGC `sanidade` endpoint — aplicações sanitárias (DET_SANIDADE) para o AgroDB.
 
-Source: Firebird 2.5 `DET_SANIDADE` (0 linhas na base de staging).
+Source: Firebird 2.5 `DET_SANIDADE` (vazia na base de staging).
 Target: POST /api/integracoes/tgc/sanidade  body {"sanidade": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -29,7 +29,7 @@ Duas consequências do watermark na PK, ambas intencionais e idênticas às de
   * ``reconcile_deletes`` fica False — tombstone só é válido depois de um full scan;
     a partir de um delta ele apagaria tudo que não veio no último delta, ou seja, tudo.
 
-AVISO: com 0 linhas na staging não há como MEDIR se a premissa "append-only" se
+AVISO: com a staging vazia não há como MEDIR se a premissa "append-only" se
 sustenta, como foi possível medir (e refutar) em DET_PESAGEM. Quando a base de produção
 chegar, vale conferir `DSANI_DATAREG` contra o comportamento real antes de confiar no
 watermark; virar full scan é uma linha (``incremental_column = None``).
@@ -82,7 +82,7 @@ class SanidadeEndpoint(BatchEndpoint):
 
     payload_key = "sanidade"
     record_key = "COD_SANIDADE"
-    error_key = "cod_sanidade"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

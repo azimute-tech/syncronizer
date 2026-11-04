@@ -45,7 +45,7 @@ def test_chave_e_animal_e_lote():
 
 def test_somas_arredondam_para_o_hash_nao_oscilar():
     """As somas são DOUBLE no Firebird; o ruído das últimas casas mudaria o row_hash
-    a cada ciclo e reenviaria 12 mil linhas sem nada ter mudado."""
+    a cada ciclo e reenviaria milhares de linhas sem nada ter mudado."""
     ep = ConsumoAnimaisEndpoint()
     a = ep.transform(_row(CONSUMO_MS_KG=1047.123456789012))
     b = ep.transform(_row(CONSUMO_MS_KG=1047.123456789999))

@@ -35,7 +35,7 @@ def test_transform_shape_and_types():
 
 
 def test_bloco_de_curva_do_contrato_v3():
-    """COD_CURVA 0 é o sentinelo "sem curva" do TGC (25 lotes na base real) e vira
+    """COD_CURVA 0 é o sentinelo "sem curva" do TGC (há lotes assim na base real) e vira
     None; DESTINO é o NOME da meta (AUX_DESTINOANIMAL.ADA_NOME); CUSTO_FIXO_DIA
     segue cru — 0,50 na base real é diária válida, não "não informado"."""
     ep = LotesEndpoint()
@@ -120,6 +120,7 @@ def test_send_posts_batch_under_lotes_key_without_farm_id():
 
 def test_send_reconciles_per_item_errors():
     ep = LotesEndpoint()
-    http = _Http({"inserted": 1, "errors": [{"cod_lote": "10002", "message": "curral inexistente"}]})
+    http = _Http({"inserted": 1, "errors": [
+        {"index": 1, "chave": "10002", "message": "curral inexistente"}]})
     res = ep.send(http, [_unsent(10001), _unsent(10002)])
     assert res.ok == ["10001"] and [pk for pk, _ in res.failed] == ["10002"]

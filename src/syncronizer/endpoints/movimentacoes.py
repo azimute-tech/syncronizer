@@ -11,8 +11,8 @@ already been sent this cycle.
 INCREMENTAL — this is the first feed to use the watermark machinery. `AHT_CODIGO` is the
 primary key AND the watermark: the table is an append-only event log fed by a monotonic
 generator, so "id greater than the last one I saw" is a complete and cheap delta. The
-first cycle has no watermark and reads the whole table (3.3k rows in the client
-database); every cycle after that reads only the new events.
+first cycle has no watermark and reads the whole table (thousands of rows in the
+client database); every cycle after that reads only the new events.
 
 Two consequences of watermarking on the PK, both intended:
   * an UPDATE to an already-synced movement is NOT picked up (its id did not change).
@@ -61,7 +61,7 @@ class MovimentacoesEndpoint(BatchEndpoint):
 
     payload_key = "movimentacoes"
     record_key = "COD_HISTORICO"
-    error_key = "cod_historico"
+    error_key = "chave"
     CHUNK = 200
 
     _BASE_SQL = """

@@ -89,8 +89,8 @@ def test_exit_block_only_for_animals_that_left():
 
 
 def test_valor_entrada_zero_do_tgc_vira_none():
-    """CA_VALORENT fica 0,00 quando a fazenda não informa o custo (backup real de
-    Birigui: 0% das linhas preenchidas). 0 é "não informado", não um animal que custou
+    """CA_VALORENT fica 0,00 quando a fazenda não informa o custo (backup real da
+    fazenda de referência: 0% das linhas preenchidas). 0 é "não informado", não um animal que custou
     R$ 0 — encaminhar 0,00 plantaria um custo falso justamente no campo que o AgroDB
     usa como fallback. Mesmo racional do VALOR_SAIDA 0,00 do rebanho vivo; contraste
     deliberado com PESO_ENTRADA=0, que É enviado (problema de qualidade)."""
@@ -107,7 +107,7 @@ def test_valor_entrada_zero_do_tgc_vira_none():
 
 def test_causa_morte_viaja_com_a_morte():
     """Morte é a única saída tratada no escopo atual e precisa vir COM a causa
-    (CA_CAUSAMORTE — 39 mortes com 16 causas distintas na base real). Padding de
+    (CA_CAUSAMORTE — dezenas de mortes, várias causas, na base real). Padding de
     CHAR/VARCHAR é removido como nos demais campos."""
     ep = AnimaisEndpoint()
     r = ep.transform(_row(SAIDA="MORTE", DATA_SAIDA=date(2026, 4, 8),
@@ -130,8 +130,9 @@ def test_causa_morte_preenchida_viaja_mesmo_fora_do_bloco_de_saida():
 
 
 def test_transform_drops_corrupted_chip():
-    """'9,63E+14' is an Excel-destroyed chip (66 rows in the client base) — dropping it
-    is not a quality gate, it is refusing to hand 66 animals the same fake identifier."""
+    """'9,63E+14' is an Excel-destroyed chip (dozens of rows in the client base) —
+    dropping it is not a quality gate, it is refusing to hand dozens of animals the same
+    fake identifier."""
     ep = AnimaisEndpoint()
     r = ep.transform(_row(CHIP="9,63E+14", SISBOV="105000012345678"))
     assert "CHIP" not in r
@@ -140,8 +141,8 @@ def test_transform_drops_corrupted_chip():
 
 def test_transform_keeps_valid_chip_and_ncf():
     ep = AnimaisEndpoint()
-    r = ep.transform(_row(CHIP="963000407320194", NCF="12345"))
-    assert r["CHIP"] == "963000407320194" and r["NCF"] == "12345"
+    r = ep.transform(_row(CHIP="982000000000001", NCF="12345"))
+    assert r["CHIP"] == "982000000000001" and r["NCF"] == "12345"
 
 
 def test_extract_spec_builds_query():
@@ -160,7 +161,7 @@ def test_extract_spec_builds_query():
 
 
 def test_bloco_de_abate_viaja_fora_do_gate_do_bloco_de_saida():
-    """CA_LOTESAIDA é a CHAVE do fechamento (3.184 dos 9.392 animais da base real,
+    """CA_LOTESAIDA é a CHAVE do fechamento (34% dos animais da base real,
     exatamente a contagem das pesagens de tipo SAIDA) e CA_RC_SAIDA/CA_PESO_ARR_SAIDA
     são o resultado individual do abate. Os três ficam FORA do bloco condicional de
     saída de propósito: ali o gate existe porque CA_VALORSAIDA fica 0,00 no rebanho
@@ -178,8 +179,8 @@ def test_bloco_de_abate_viaja_fora_do_gate_do_bloco_de_saida():
 
 
 def test_animal_em_lote_de_abate_sem_rc_individual():
-    """Assimetria real da base: 3.184 animais têm CA_LOTESAIDA mas só 2.258 têm
-    CA_RC_SAIDA. Os 926 restantes têm que chegar ao destino como ausência (None), não
+    """Assimetria real da base: há animais com CA_LOTESAIDA e sem
+    CA_RC_SAIDA. Esses têm que chegar ao destino como ausência (None), não
     como zero."""
     r = AnimaisEndpoint().transform(_row(COD_LOTE_SAIDA=8, RC_SAIDA=None,
                                          ARROBAS_SAIDA=None))
@@ -214,7 +215,8 @@ def _unsent(cod):
 def test_send_batches_and_reconciles_per_item_errors():
     ep = AnimaisEndpoint()
     rows = [_unsent(1), _unsent(2), _unsent(3)]
-    http = _Http({"inserted": 2, "updated": 0, "errors": [{"cod_animal": "3", "message": "dup"}]})
+    http = _Http({"inserted": 2, "updated": 0, "errors": [
+        {"index": 2, "chave": "3", "message": "dup"}]})
     res = ep.send(http, rows)
     assert set(res.ok) == {"1", "2"}
     assert [pk for pk, _ in res.failed] == ["3"]
@@ -226,9 +228,9 @@ def test_send_batches_and_reconciles_per_item_errors():
 
 
 def test_send_matches_errors_when_api_echoes_numeric_id():
-    """The API may echo cod_animal as a JSON number; the row must still be marked failed."""
+    """The API may echo chave as a JSON number; the row must still be marked failed."""
     ep = AnimaisEndpoint()
-    http = _Http({"inserted": 1, "errors": [{"cod_animal": 3, "message": "dup"}]})
+    http = _Http({"inserted": 1, "errors": [{"index": 1, "chave": 3, "message": "dup"}]})
     res = ep.send(http, [_unsent(1), _unsent(3)])
     assert res.ok == ["1"] and [pk for pk, _ in res.failed] == ["3"]
 

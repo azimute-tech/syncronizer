@@ -9,8 +9,8 @@ Two things live here:
   same Firebird types (INTEGER with scale, DATE, CHAR ``S``/``N``) into the same JSON
   shapes, so the rules are declared once;
 * :class:`BatchEndpoint` — all TGC feeds POST an array under a wrapper key and get
-  ``200 {inserted, updated, errors:[{<id>, message}]}`` back, reconciling per-item
-  failures. Only the wrapper key and the identifier field differ per feed.
+  ``200 {inserted, updated, errors:[{index, chave, message}]}`` back, reconciling
+  per-item failures. Only the wrapper key and the record identifier differ per feed.
 
 Note that :class:`BatchEndpoint` is abstract (it implements neither ``extract_spec``
 nor ``transform``) and lives in a private module, so the registry cannot pick it up
@@ -27,7 +27,7 @@ from syncronizer.core.endpoint import Endpoint, SendResult
 # A chip/SISBOV read out of a spreadsheet that Excel already destroyed: "9,63E+14".
 # The value is unrecoverable (the original digits are gone), so it is dropped instead
 # of being propagated as if it were an identifier. Verified in the client database:
-# 66 rows, and this is the ONLY non-numeric chip value present.
+# dozens of rows, and this is the ONLY non-numeric chip value present.
 _SCIENTIFIC_NOTATION = re.compile(r"^\d+[.,]\d+[eE][+-]?\d+$")
 
 
@@ -150,9 +150,10 @@ class BatchEndpoint(Endpoint):
     """An endpoint that POSTs its rows as one array per request.
 
     Subclasses set ``payload_key`` (the JSON wrapper), ``record_key`` (the identifier
-    field in the transformed record) and ``error_key`` (the same identifier as the API
-    echoes it inside ``errors[]``). Rows the API rejects individually are marked failed
-    and retried next cycle; the rest of the chunk is marked sent.
+    field in the transformed record) and ``error_key`` (the field of each ``errors[]``
+    entry where the API echoes that identifier — ``chave`` on every TGC route). Rows the
+    API rejects individually are marked failed and retried next cycle; the rest of the
+    chunk is marked sent.
 
     There is no local quality gate anywhere: every extracted row is sent so the
     destination surfaces the problem. Corrections happen in TGC and the next cycle

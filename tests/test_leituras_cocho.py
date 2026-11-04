@@ -33,8 +33,8 @@ def test_transform_shape_and_types():
 
 
 def test_nota_de_meio_ponto_nao_pode_virar_int():
-    """A nota de cocho NÃO é inteira: a base real tem 288 leituras com 0,50 e 416 com
-    1,50. Coagir para int arredondaria ~700 leituras em silêncio (0,5→0, 1,5→1) —
+    """A nota de cocho NÃO é inteira: a base real tem leituras com 0,50 e com 1,50.
+    Coagir para int arredondaria centenas de leituras em silêncio (0,5→0, 1,5→1) —
     a nota viaja como float."""
     ep = LeiturasCochoEndpoint()
     assert ep.transform(_row(NOTA=Decimal("0.50")))["NOTA"] == 0.5
@@ -44,7 +44,7 @@ def test_nota_de_meio_ponto_nao_pode_virar_int():
 
 
 def test_nota_null_e_leitura_sem_nota():
-    """628 leituras na base real não têm nota (NULL) — é leitura válida e viaja com
+    """Há leituras na base real sem nota (NULL) — é leitura válida e viaja com
     NOTA None; o ajuste 0 é dado real ("manter") e viaja como 0.0."""
     ep = LeiturasCochoEndpoint()
     r = ep.transform(_row(NOTA=None, AJUSTE_KG_MS=Decimal("0.000")))
@@ -108,6 +108,6 @@ def test_send_posts_batch_under_leituras_cocho_key_without_farm_id():
 def test_send_reconciles_per_item_errors():
     ep = LeiturasCochoEndpoint()
     http = _Http({"inserted": 1, "errors": [
-        {"cod_leitura": "22965", "message": "curral inexistente"}]})
+        {"index": 1, "chave": "22965", "message": "curral inexistente"}]})
     res = ep.send(http, [_unsent(22964), _unsent(22965)])
     assert res.ok == ["22964"] and [pk for pk, _ in res.failed] == ["22965"]

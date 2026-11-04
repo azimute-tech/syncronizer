@@ -1,7 +1,7 @@
 """TGC `curvas_lote` endpoint — a curva de ganho COPIADA para cada lote.
 
-Source: Firebird 2.5 `DET_GMDPROJ_LOTE` (40.740 linhas, 139 lotes na base de staging;
-        uma linha por lote x dia, sem duplicata, até o dia 420).
+Source: Firebird 2.5 `DET_GMDPROJ_LOTE` (dezenas de milhares de linhas na base de
+        staging; uma linha por lote x dia, sem duplicata, por centenas de dias).
 Target: POST /api/integracoes/tgc/curvas-lote  body {"curvas_lote": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -10,8 +10,8 @@ POR QUE EXISTE — o feed `curvas` espelha o CATÁLOGO (`DET_GMDPROJETADO`, por 
 categoria). O TGC não projeta por ele: na criação do lote a curva é copiada para
 `DET_GMDPROJ_LOTE` (`CAD_LOTE_CRIAGMD`) e é essa cópia que entra no peso projetado
 (`CNT_PESO_MEDIO_ATUAL`, `DACRES_PESO_MED_CLI`). O catálogo pode ser editado depois sem
-mexer nos lotes — no backup de 09/09/2026 ele está inteiro em 1,35 kg/dia (3.270
-linhas, um único valor) e os lotes seguem com 42 valores distintos de GMD. Projetar
+mexer nos lotes — na base de staging o catálogo tem um único valor de GMD e os lotes
+seguem com dezenas de valores distintos. Projetar
 pelo catálogo deixava o AgroDB ~5% abaixo do TGC em todo lote.
 
 Roda logo depois de `lotes` (order=21).
@@ -21,7 +21,7 @@ sentido inteira, então o record embute a série como array ordenado e o destino
 SUBSTITUI a curva do lote. A agregação é no SQL (`LIST()` com GROUP BY); o LIST não
 garante ordem, a ordenação é do transform.
 
-FULL SCAN + row_hash — 139 records; um dia editado muda o hash e re-envia a curva
+FULL SCAN + row_hash — um record por lote; um dia editado muda o hash e re-envia a curva
 inteira do lote, que é a unidade de consistência. ``reconcile_deletes`` fica False.
 
 Escala: `DGP_GMD` é DECIMAL(18,2); o `||` do Firebird já o renderiza com a escala
@@ -46,7 +46,7 @@ class CurvasLoteEndpoint(BatchEndpoint):
 
     payload_key = "curvas_lote"
     record_key = "COD_LOTE"
-    error_key = "cod_lote"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

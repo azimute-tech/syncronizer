@@ -84,6 +84,7 @@ def test_send_posts_batch_under_metas_abate_key_without_farm_id():
 
 def test_send_reconciles_per_item_errors():
     ep = MetasAbateEndpoint()
-    http = _Http({"inserted": 1, "errors": [{"destino": "LEVE 480", "message": "inválido"}]})
+    http = _Http({"inserted": 1, "errors": [
+        {"index": 0, "chave": "LEVE 480", "message": "inválido"}]})
     res = ep.send(http, [_unsent("LEVE 480"), _unsent("MÉDIO 520")])
     assert res.ok == ["MÉDIO 520"] and [pk for pk, _ in res.failed] == ["LEVE 480"]

@@ -29,7 +29,7 @@ Contract v2 (jul/2026) — what changed against the first version:
     for exactly that). Do not "unify" the two.
 
 VALOR_ENTRADA (`CA_VALORENT`, ago/2026) — campo estrutural para o fallback de custo do
-animal no AgroDB. Em Birigui ele vem hoje 0/NULL (verificado no backup real: 0% das
+animal no AgroDB. Na fazenda de referência ele vem hoje 0/NULL (verificado no backup real: 0% das
 linhas preenchidas), mas o espelho precisa da coluna pronta para quando a fazenda
 passar a preencher — sem ela o dado novo seria descartado em silêncio. O 0,00 é o
 default intocado do TGC para "não informado" (mesmo racional do bloco de saída:
@@ -41,8 +41,8 @@ ruim, é ausência de dado.
 
 CAUSA_MORTE (`CA_CAUSAMORTE`, ago/2026, contrato v3) — morte é a única saída tratada
 no escopo atual e precisa viajar COM a causa. Na base real ela só aparece preenchida
-em animais com CA_SAIDA='MORTE' (39 animais, 16 causas distintas — de PNEUMONIA a
-RAIO, incluindo lixo como "167-27", que viaja mesmo assim: sem quality gate local),
+em animais com CA_SAIDA='MORTE' (dezenas de animais, várias causas — de PNEUMONIA a
+RAIO, incluindo lixo numérico, que viaja mesmo assim: sem quality gate local),
 mas o envio NÃO é condicionado ao bloco de saída — dado preenchido viaja, seja qual
 for a saída, para o espelho nunca descartar causa em silêncio se o TGC preencher
 fora do padrão.
@@ -52,12 +52,12 @@ animal ao fechamento por lote de abate e traz o resultado individual do abate:
 
   * COD_LOTE_SAIDA (`CA_LOTESAIDA`) é a CHAVE DO FECHAMENTO: aponta para
     `lotes_saida_tgc.cod_lote_saida` (CLS_CODIGO, feed `lotes_saida`). Preenchida em
-    3.184 dos 9.392 animais da base real — exatamente a mesma contagem das pesagens de
+    34% dos animais da base real — exatamente a mesma contagem das pesagens de
     tipo SAIDA — e nunca 0, com zero órfãos contra CAD_LOTESAIDA.
   * RC_SAIDA (`CA_RC_SAIDA`) e ARROBAS_SAIDA (`CA_PESO_ARR_SAIDA`) são o RC real e a
-    arroba de carcaça POR ANIMAL. Preenchidas em 2.258 animais e NUNCA 0: ou o TGC tem
-    o número, ou a coluna é NULL. Note a assimetria contra o COD_LOTE_SAIDA — 926
-    animais estão num lote de abate sem RC/arroba individual, e o relatório precisa
+    arroba de carcaça POR ANIMAL. Preenchidas em parte deles e NUNCA 0: ou o TGC tem
+    o número, ou a coluna é NULL. Note a assimetria contra o COD_LOTE_SAIDA — há
+    animais num lote de abate sem RC/arroba individual, e o relatório precisa
     tratar isso como ausência, não como zero.
 
 Os três NÃO entram no bloco condicional de saída (que existe porque CA_VALORSAIDA fica
@@ -82,7 +82,7 @@ locally — every animal is sent so the destination surfaces the issue. Correcti
 in the source (TGC); the next sync detects the changed row (by COD_ANIMAL within the farm)
 and re-sends it with the corrected value. The single exception is the chip literal
 "9,63E+14" (see ``_common.clean_id``): that is not a low-quality identifier, it is a
-destroyed one, and forwarding it would attach the same fake chip to 66 animals.
+destroyed one, and forwarding it would attach the same fake chip to dozens of animals.
 """
 from __future__ import annotations
 
@@ -134,7 +134,7 @@ class AnimaisEndpoint(BatchEndpoint):
 
     payload_key = "animais"
     record_key = "COD_ANIMAL"
-    error_key = "cod_animal"
+    error_key = "chave"
     CHUNK = 200                      # animals per POST (<= API max 500, under rate limits)
 
     _BASE_SQL = """

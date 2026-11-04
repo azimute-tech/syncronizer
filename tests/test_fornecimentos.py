@@ -10,9 +10,9 @@ def _row(**over):
     base = {
         "COD_FORNECIMENTO": 41021, "DATA": date(2026, 8, 5),
         "COD_LOTE": 10132, "COD_CURRAL": 252, "COD_RACAO_PROD": 10023, "TRATO": 4,
-        "PREVISTO_KG": Decimal("252.0691"), "REALIZADO_KG": Decimal("290.0000"),
+        "PREVISTO_KG": Decimal("250.0500"), "REALIZADO_KG": Decimal("280.0000"),
         "SOBRA_KG": Decimal("0.0000"), "QTD_CABECAS": 108,
-        "MS_PCT": Decimal("56.8620"), "CUSTO_KG_MN": Decimal("0.5679"),
+        "MS_PCT": Decimal("55.5000"), "CUSTO_KG_MN": Decimal("0.6000"),
     }
     base.update(over)
     return base
@@ -25,16 +25,16 @@ def test_transform_shape_and_types():
     assert r["DATA"] == "2026-08-05"
     assert r["COD_LOTE"] == "10132" and r["COD_CURRAL"] == "252"
     assert r["TRATO"] == 4 and isinstance(r["TRATO"], int)
-    assert r["PREVISTO_KG"] == 252.0691 and isinstance(r["PREVISTO_KG"], float)
-    assert r["REALIZADO_KG"] == 290.0
+    assert r["PREVISTO_KG"] == 250.05 and isinstance(r["PREVISTO_KG"], float)
+    assert r["REALIZADO_KG"] == 280.0
     assert r["QTD_CABECAS"] == 108 and isinstance(r["QTD_CABECAS"], int)
-    assert r["MS_PCT"] == 56.862
-    assert r["CUSTO_KG_MN"] == 0.5679
+    assert r["MS_PCT"] == 55.5
+    assert r["CUSTO_KG_MN"] == 0.6
 
 
 def test_kg_zero_e_dado_real_mas_custo_zero_vira_none():
-    """kg 0 é trato previsto e não fornecido (2.443 linhas na base real) e VIAJA como
-    0.0; custo 0,0000 é o default "não informado" do TGC (1.838 linhas) e vira None —
+    """kg 0 é trato previsto e não fornecido (há linhas assim na base real) e VIAJA
+    como 0.0; custo 0,0000 é o default "não informado" do TGC e vira None —
     encaminhá-lo plantaria custo alimentar falso de R$ 0/kg."""
     ep = FornecimentosEndpoint()
     r = ep.transform(_row(REALIZADO_KG=Decimal("0.0000"), SOBRA_KG=Decimal("0.0000"),
@@ -43,12 +43,12 @@ def test_kg_zero_e_dado_real_mas_custo_zero_vira_none():
     assert r["CUSTO_KG_MN"] is None                              # não informado
     assert ep.transform(_row(CUSTO_KG_MN=None))["CUSTO_KG_MN"] is None
     # custo preenchido viaja como float
-    assert ep.transform(_row(CUSTO_KG_MN=Decimal("0.5679")))["CUSTO_KG_MN"] == 0.5679
+    assert ep.transform(_row(CUSTO_KG_MN=Decimal("0.6000")))["CUSTO_KG_MN"] == 0.6
 
 
 def test_data_e_do_fornecimento_nunca_a_de_registro():
     """CFORN_DATAFORNECIDO é a data do trato; CFORN_DATAREG é quando foi digitado
-    (114 linhas divergem na base real — registro na manhã seguinte). Usar a data de
+    (há linhas que divergem na base real — registro na manhã seguinte). Usar a data de
     registro jogaria o consumo no dia errado. Não existe coluna CFORN_DATA."""
     spec = FornecimentosEndpoint().extract_spec(ExtractContext(last_watermark=None))
     assert "CFORN_DATAFORNECIDO" in spec.sql
@@ -56,7 +56,7 @@ def test_data_e_do_fornecimento_nunca_a_de_registro():
 
 
 def test_extract_spec_filtra_d1_full_scan():
-    """O dia corrente fica de fora (tratos 1..4 lançados ao longo do dia + sobra que
+    """O dia corrente fica de fora (vários tratos lançados ao longo do dia + sobra que
     só fecha no dia seguinte): espelhar o dia aberto enviaria consumo parcial."""
     ep = FornecimentosEndpoint()
     spec = ep.extract_spec(ExtractContext(last_watermark=None))
@@ -126,6 +126,6 @@ def test_send_posts_batch_under_fornecimentos_key_without_farm_id():
 def test_send_reconciles_per_item_errors():
     ep = FornecimentosEndpoint()
     http = _Http({"inserted": 1, "errors": [
-        {"cod_fornecimento": "41021", "message": "lote inexistente"}]})
+        {"index": 1, "chave": "41021", "message": "lote inexistente"}]})
     res = ep.send(http, [_unsent(41020), _unsent(41021)])
     assert res.ok == ["41020"] and [pk for pk, _ in res.failed] == ["41021"]
