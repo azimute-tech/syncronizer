@@ -1,7 +1,6 @@
 """TGC `metas_abate` endpoint — metas de abate por destino (AUX_DESTINOANIMAL).
 
-Source: Firebird 2.5 `AUX_DESTINOANIMAL` (3 linhas na base real: LEVE 480,
-        MÉDIO 520, PESADO 550).
+Source: Firebird 2.5 `AUX_DESTINOANIMAL` (poucas linhas, ex.: "MÉDIO 520").
 Target: POST /api/integracoes/tgc/metas-abate  body {"metas_abate": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -15,7 +14,7 @@ schema real). O payload espelha os dois sexos; achatar para uma coluna única
 inventaria um dado que a fonte não tem.
 
 Escalas (driver já aplica): ADA_PESOABATEM/F BIGINT scale -4 (520.0000 kg),
-ADA_PESOABATERCM/F scale -2 (53.00 %), ADA_VALORARROBA_M/F scale -2 (89.00 R$).
+ADA_PESOABATERCM/F scale -2 (53.00 %), ADA_VALORARROBA_M/F scale -2 (300.00 R$).
 """
 from __future__ import annotations
 
@@ -30,7 +29,7 @@ class MetasAbateEndpoint(BatchEndpoint):
     api_path = "/api/integracoes/tgc/metas-abate"  # URL com hifen (padrao de rota do AgroDB); payload_key segue com underscore
     api_method = "POST"
 
-    # Full scan + row_hash — 3 linhas; edição de meta re-envia via hash.
+    # Full scan + row_hash — poucas linhas; edição de meta re-envia via hash.
     incremental_column = None
     reconcile_deletes = False
 

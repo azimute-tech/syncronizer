@@ -6,7 +6,7 @@ Auth:   X-API-Key (or Authorization: Bearer) = per-farm TGC token. farm_id comes
         the token server-side and is NOT sent in the body.
 
 Runs first (order=10) because both `lotes` and `animais` reference a curral. The table
-is tiny (19 rows in the client database), so it is a full scan every cycle and
+is tiny (tens of rows in the client database), so it is a full scan every cycle and
 ``row_hash`` decides what actually gets re-sent.
 
 `CC_TIPO` is what separates a paddock from a feedlot pen (PASTO | CONFINAMENTO) — it is

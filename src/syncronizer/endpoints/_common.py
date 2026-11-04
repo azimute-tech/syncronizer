@@ -27,7 +27,7 @@ from syncronizer.core.endpoint import Endpoint, SendResult
 # A chip/SISBOV read out of a spreadsheet that Excel already destroyed: "9,63E+14".
 # The value is unrecoverable (the original digits are gone), so it is dropped instead
 # of being propagated as if it were an identifier. Verified in the client database:
-# 66 rows, and this is the ONLY non-numeric chip value present.
+# dozens of rows, and this is the ONLY non-numeric chip value present.
 _SCIENTIFIC_NOTATION = re.compile(r"^\d+[.,]\d+[eE][+-]?\d+$")
 
 

@@ -1,6 +1,6 @@
 """TGC `fornecimentos` endpoint — tratos diários (CAD_FORNECIMENTO) para o AgroDB.
 
-Source: Firebird 2.5 `CAD_FORNECIMENTO` (11,6k linhas na base real, ~64/dia).
+Source: Firebird 2.5 `CAD_FORNECIMENTO` (milhares de linhas na base real, dezenas/dia).
 Target: POST /api/integracoes/tgc/fornecimentos  body {"fornecimentos": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -9,12 +9,12 @@ Roda depois dos feeds de referência (order=50): o lote e o curral que um trato 
 já foram enviados no mesmo ciclo.
 
 A DATA do trato é `CFORN_DATAFORNECIDO` (a data em que o trato foi fornecido), NÃO
-`CFORN_DATAREG` (a data em que foi registrado). Na base real 114 linhas divergem —
+`CFORN_DATAREG` (a data em que foi registrado). Na base real há linhas que divergem —
 trato do fim do dia registrado na manhã seguinte — e usar a data de registro jogaria
 o consumo no dia errado. Não existe coluna `CFORN_DATA`.
 
 FILTRO D-1 — `WHERE CFORN_DATAFORNECIDO < CURRENT_DATE`. O dia corrente fica de fora
-de propósito: os tratos são lançados ao longo do dia (1..4 na base real) e a sobra de
+de propósito: os tratos são lançados ao longo do dia (vários por dia) e a sobra de
 cocho só fecha no dia seguinte; espelhar o dia aberto mandaria um consumo parcial que
 o AgroDB leria como consumo baixo. O dia fechado entra completo no ciclo seguinte.
 
@@ -25,19 +25,19 @@ feeds; a armadilha conhecida é LOG_DELETA_TRATO (trato PODE ser deletado no TGC
 enquanto a reconciliação de deleção não existir no destino, um trato deletado
 persiste no espelho — documentado aqui para não virar surpresa.
 
-Zeros: kg zerado É dado real (2.443 tratos com REALIZADO 0,0000 na base — trato
-previsto e não fornecido) e viaja como 0.0. Já `CFORN_CUSTO` 0,0000 (1.838 linhas)
+Zeros: kg zerado É dado real (há tratos com REALIZADO 0,0000 na base — trato
+previsto e não fornecido) e viaja como 0.0. Já `CFORN_CUSTO` 0,0000
 é o default "não informado" do TGC — vira None em vez de plantar custo alimentar
 falso de R$ 0/kg (mesmo racional do VALOR_ENTRADA em `animais`).
 
 Escalas: PREVISTO/REALIZADO/SOBRACOCHO/MSRACAO/CUSTO são BIGINT scale -4; o driver
-firebirdsql devolve Decimal já com a escala aplicada (252.0691 kg, 56.8620 %MS,
-0.5679 R$/kg — conferido na base real).
+firebirdsql devolve Decimal já com a escala aplicada (ex.: 250.0500 kg, 55.5000 %MS,
+0.6000 R$/kg).
 
 COD_RACAO_PROD (`CFORN_CODRACAOPROD`, ago/2026) — a dieta que o trato entregou, para o
 corte por dieta no relatório de Tratos. Aponta para `racoes_tgc.cod_racao_prod`
 (CRP_CODIGO, feed `racoes` order=20, que já roda antes deste). Na base real está
-preenchida em 13.082/13.082 linhas, nunca 0 e nunca NULL, com zero órfãos contra
+preenchida em todas as linhas, nunca 0 e nunca NULL, com zero órfãos contra
 CAD_RACAO_PROD — ainda assim passa por ``opt_code`` para que o 0 sentinela do TGC, se
 aparecer, não vire referência pendurada no destino. NÃO confundir com
 `CFORN_CODRACAOPROD_PREV` (a dieta PREVISTA pelo plano) nem com

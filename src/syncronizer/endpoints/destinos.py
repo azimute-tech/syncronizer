@@ -1,14 +1,14 @@
 """TGC `destinos` endpoint — cadastro de destinos de abate (CAD_ESTGTA).
 
-Source: Firebird 2.5 `CAD_ESTGTA` (9 linhas na base de staging) — o cadastro de
+Source: Firebird 2.5 `CAD_ESTGTA` (unidades de linhas na staging) — o cadastro de
         estabelecimentos/GTA que `CAD_LOTESAIDA.CLS_CODDESTINO` referencia.
 Target: POST /api/integracoes/tgc/destinos  body {"destinos": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
 
 PARA QUE SERVE: dar NOME ao destino nos relatórios de fechamento/financeiro. O
-`cod_destino` de `lotes_saida_tgc` aparecia como "6" na tela — o dono lê "MARFRIG
-GLOBAL FOOD, Promissão". Pedido do Nelson em 17/08/2026; era backlog declarado desde
+`cod_destino` de `lotes_saida_tgc` aparecia como número na tela — o dono lê o nome do
+frigorífico e a cidade. Pedido do sócio em 17/08/2026; era backlog declarado desde
 a onda 039.
 
 Roda cedo (order=20), junto dos demais catálogos: `lotes_saida` (order maior)

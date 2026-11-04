@@ -1,6 +1,6 @@
 """TGC `lotes_saida` endpoint — lote de saída / fechamento de abate (CAD_LOTESAIDA).
 
-Source: Firebird 2.5 `CAD_LOTESAIDA` (48 linhas na base de staging).
+Source: Firebird 2.5 `CAD_LOTESAIDA` (dezenas de linhas na base de staging).
 Target: POST /api/integracoes/tgc/lotes-saida  body {"lotes_saida": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -9,11 +9,11 @@ O lote de saída é a UNIDADE do fechamento de abate: é ele que o animal refere
 (`CAD_ANIMAL.CA_LOTESAIDA`, enviado pelo feed `animais`) e a que os custos de
 `lotes_saida_custos` se penduram. Roda no bloco de fechamento (order=61).
 
-FULL SCAN + row_hash — 48 linhas, e a tabela é toda feita de correção: o lote nasce no
-embarque com peso de confinamento e vai recebendo peso de porteira, peso de frigorífico,
-carcaça, RC, nota fiscal e pagamento ao longo de semanas. Não existe coluna de
-watermark que capture isso (não há `CLS_DATA_UPDATE`), e um watermark por `CLS_CODIGO`
-congelaria o lote no estado do embarque. Mesmo critério dos catálogos e de
+FULL SCAN + row_hash — dezenas de linhas, e a tabela é toda feita de correção: o lote
+nasce no embarque com peso de confinamento e vai recebendo peso de porteira, peso de
+frigorífico, carcaça, RC, nota fiscal e pagamento ao longo de semanas. Não existe
+coluna de watermark que capture isso (não há `CLS_DATA_UPDATE`), e um watermark por
+`CLS_CODIGO` congelaria o lote no estado do embarque. Mesmo critério dos catálogos e de
 `metas_abate`. ``reconcile_deletes`` fica False como nos demais feeds.
 
 VALORES FINANCEIROS SÃO REFERÊNCIA/CONFERÊNCIA. A receita canônica do abate é o
@@ -23,26 +23,26 @@ decide nada disso, só espelha o que o TGC tem.
 
 Zeros medidos na staging (regra do contrato: valor/custo 0 é "não informado" e vira
 None; peso/quantidade 0 é dado real e viaja como 0.0):
-  * `CLS_FRIG_PESOKG` = 0 em 48/48 -> None (o contrato já prevê: "0 é comum").
-  * `CLS_VALOR_IMPOSTOS`, `CLS_VALOR_NF`, `CLS_CUSTODIARIA` = 0 em 48/48 -> None.
-  * `CLS_VALORBRUTO` / `CLS_VALORLIQUIDO` = 0 em 6/48 -> None; os outros 42 têm valor.
-  * `CLS_CONF_PESOKG` = 0 em 3/48 e `CLS_KGTOTALCARCACA` = 0 em 6/48: são PESOS, e o
+  * `CLS_FRIG_PESOKG` = 0 em todas -> None (o contrato já prevê: "0 é comum").
+  * `CLS_VALOR_IMPOSTOS`, `CLS_VALOR_NF`, `CLS_CUSTODIARIA` = 0 em todas -> None.
+  * `CLS_VALORBRUTO` / `CLS_VALORLIQUIDO` = 0 em poucas -> None; as demais têm valor.
+  * `CLS_CONF_PESOKG` e `CLS_KGTOTALCARCACA` = 0 em poucas linhas: são PESOS, e o
     contrato só manda anular o peso de frigorífico, então viajam como 0.0.
 
 DIVERGÊNCIAS medidas contra o contrato (documentadas, não corrigidas em silêncio):
-  * `CLS_PORT_PESOKG` (peso na porteira do frigorífico) é 0 em 44 das 48 linhas — o
+  * `CLS_PORT_PESOKG` (peso na porteira do frigorífico) é 0 em quase todas — o
     mesmo padrão que levou o contrato a mandar anular `FRIG_PESO_KG`. Como o contrato
     NÃO estende a regra a este campo, ele viaja como 0.0; se o destino quiser ler isso
     como "não informado", a regra tem que ser decidida no contrato, não aqui.
   * `CLS_NUMERONF`, `CLS_NUMCONTRATO`, `CLS_DATAPAGTO_PREV` e `CLS_DATAPAGTO_PAGO` são
-    NULL em 48/48: o bloco fiscal/financeiro do lote nunca foi preenchido nesta base.
+    NULL em todas: o bloco fiscal/financeiro do lote nunca foi preenchido nesta base.
     As colunas entram prontas para quando a fazenda passar a preencher — sem elas o
     dado novo seria descartado em silêncio (mesmo racional do VALOR_ENTRADA em
     `animais`).
 
 Escalas: todas as colunas de peso/valor/RC são BIGINT scale -2 e o driver firebirdsql
-devolve Decimal com a escala já aplicada (61612.00 kg, 53.25 %, 800598.32 R$).
-`CLS_FLAG_FECHADO` é CHAR(1) 'S'/'N' (26 'S' e 22 'N' na staging) e vira boolean.
+devolve Decimal com a escala já aplicada (ex.: 60000.00 kg, 53.33 %, 640000.00 R$).
+`CLS_FLAG_FECHADO` é CHAR(1) 'S'/'N' (os dois aparecem na staging) e vira boolean.
 """
 from __future__ import annotations
 
@@ -131,7 +131,7 @@ class LotesSaidaEndpoint(BatchEndpoint):
             "CONF_PESO_KG": num(row.get("CONF_PESO_KG")),
             "CONF_QTD_CAB": integer(row.get("CONF_QTD_CAB")),
             "PORT_PESO_KG": num(row.get("PORT_PESO_KG")),
-            # exceção do contrato: peso de frigorífico 0 é "não informado" (48/48)
+            # exceção do contrato: peso de frigorífico 0 é "não informado" (em todas)
             "FRIG_PESO_KG": _valor(row.get("FRIG_PESO_KG")),
             "FRIG_QTD_CAB": integer(row.get("FRIG_QTD_CAB")),
             "KG_TOTAL_CARCACA": num(row.get("KG_TOTAL_CARCACA")),

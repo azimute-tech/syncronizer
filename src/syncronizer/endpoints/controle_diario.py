@@ -1,6 +1,6 @@
 """TGC `controle_diario` endpoint — gabarito diário do lote (CONTROLE_DIARIO).
 
-Source: Firebird 2.5 `CONTROLE_DIARIO` (6,8k linhas na base real, 2 por lote/dia).
+Source: Firebird 2.5 `CONTROLE_DIARIO` (milhares de linhas na base real, 2 por lote/dia).
 Target: POST /api/integracoes/tgc/controle-diario  body {"controle_diario": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -12,17 +12,17 @@ previsão de abate) — o AgroDB usa como gabarito de reconciliação dos cálcu
 próprios e como série histórica pronta.
 
 CHAVE — `CNT_CODIGO` é a PK física, mas a identidade de NEGÓCIO é
-COD_LOTE|DATA|TIPO (única nas 6.847 linhas da base real, conferido): um re-cálculo
+COD_LOTE|DATA|TIPO (única em todas as linhas da base real, conferido): um re-cálculo
 no TGC pode recriar a linha com outro CNT_CODIGO e o espelho deve sobrescrever o
 mesmo dia, não duplicá-lo. O transform materializa essa identidade no campo CHAVE
 (também é o que a API ecoa em errors[].chave); ``primary_key`` composto gera o
 mesmo valor para a tabela de controle local.
 
-TIPO (`CNT_TIPO`) — GERAL | REBANHO (3.409 / 3.438 na base): duas visões de cálculo
+TIPO (`CNT_TIPO`) — GERAL | REBANHO (~meio a meio na base): duas visões de cálculo
 do mesmo lote×dia; as duas viajam e o destino escolhe qual ler.
 
 CURRAL_NOME — `CNT_CURRAL` existe mas é VARCHAR(30) com o NOME do curral ("B-1",
-"RMG-2"), não o código. Vai como CURRAL_NOME, seguindo o precedente de
+"C-2"), não o código. Vai como CURRAL_NOME, seguindo o precedente de
 `movimentacoes` (nome fica nome; AgroDB resolve localmente contra currais_tgc).
 Chamá-lo de COD_CURRAL repetiria o bug silencioso de join documentado em `animais`.
 

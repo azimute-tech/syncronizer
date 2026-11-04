@@ -1,6 +1,6 @@
 """TGC `leituras_cocho` endpoint — leitura de cocho (CAD_LEITURA) para o AgroDB.
 
-Source: Firebird 2.5 `CAD_LEITURA` (3,4k linhas na base real).
+Source: Firebird 2.5 `CAD_LEITURA` (milhares de linhas na base real).
 Target: POST /api/integracoes/tgc/leituras-cocho  body {"leituras_cocho": [ ... ]}.
 Auth:   X-API-Key (ou Authorization: Bearer) = token TGC por fazenda. farm_id vem do
         token no servidor e NÃO viaja no body.
@@ -12,9 +12,9 @@ FILTRO D-1 — `WHERE CLC_DATALEITURA < CURRENT_DATE`, mesmo racional do feed
 corrente está em movimento; só o dia fechado espelha.
 
 NOTA — CUIDADO: a nota de cocho NÃO é inteira. `CLC_NOTA` é BIGINT scale -2 e a
-base real tem 288 leituras com nota 0,50 e 416 com 1,50 (escala −3,00..+3,00 em
-meios pontos). Coagir para int silenciosamente arredondaria ~700 leituras
-(0,5→0, 1,5→1), então a nota viaja como float via ``num``. NULL (628 linhas —
+base real tem leituras com nota 0,50 e com 1,50 (escala −3,00..+3,00 em
+meios pontos). Coagir para int silenciosamente arredondaria centenas de leituras
+(0,5→0, 1,5→1), então a nota viaja como float via ``num``. NULL (há linhas assim —
 leitura lançada sem nota) segue None.
 
 `CLC_KGMSCAB` / `CLC_KGMSCABAJUSTADO` / `CLC_KGMSREALIZADO` são DOUBLE (kg de MS
