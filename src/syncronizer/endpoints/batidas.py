@@ -88,7 +88,7 @@ class BatidasEndpoint(BatchEndpoint):
 
     payload_key = "batidas"
     record_key = "COD_BATIDA"
-    error_key = "cod_batida"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

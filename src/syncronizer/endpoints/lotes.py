@@ -63,7 +63,7 @@ class LotesEndpoint(BatchEndpoint):
 
     payload_key = "lotes"
     record_key = "COD_LOTE"
-    error_key = "cod_lote"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

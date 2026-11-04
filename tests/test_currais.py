@@ -89,6 +89,7 @@ def test_send_posts_batch_under_currais_key_without_farm_id():
 
 def test_send_reconciles_per_item_errors():
     ep = CurraisEndpoint()
-    http = _Http({"inserted": 1, "errors": [{"cod_curral": "230", "message": "nome duplicado"}]})
+    http = _Http({"inserted": 1, "errors": [
+        {"index": 1, "chave": "230", "message": "nome duplicado"}]})
     res = ep.send(http, [_unsent(212), _unsent(230)])
     assert res.ok == ["212"] and [pk for pk, _ in res.failed] == ["230"]

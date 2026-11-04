@@ -60,7 +60,7 @@ class RacoesEndpoint(BatchEndpoint):
 
     payload_key = "racoes"
     record_key = "COD_RACAO_PROD"
-    error_key = "cod_racao_prod"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

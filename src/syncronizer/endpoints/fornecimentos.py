@@ -82,7 +82,7 @@ class FornecimentosEndpoint(BatchEndpoint):
 
     payload_key = "fornecimentos"
     record_key = "COD_FORNECIMENTO"
-    error_key = "cod_fornecimento"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

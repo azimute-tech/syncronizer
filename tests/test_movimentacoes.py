@@ -144,7 +144,7 @@ def test_send_posts_batch_under_movimentacoes_key_without_farm_id():
 def test_send_reconciles_per_item_errors():
     ep = MovimentacoesEndpoint()
     http = _Http({"inserted": 1,
-                  "errors": [{"cod_historico": "653", "message": "animal inexistente"}]})
+                  "errors": [{"index": 1, "chave": "653", "message": "animal inexistente"}]})
     res = ep.send(http, [_unsent(652), _unsent(653)])
     assert res.ok == ["652"] and [pk for pk, _ in res.failed] == ["653"]
 

@@ -74,7 +74,7 @@ class BatidasItensEndpoint(BatchEndpoint):
 
     payload_key = "itens"
     record_key = "COD_ITEM"
-    error_key = "cod_item"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

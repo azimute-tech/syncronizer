@@ -36,7 +36,7 @@ class MetasAbateEndpoint(BatchEndpoint):
 
     payload_key = "metas_abate"
     record_key = "DESTINO"
-    error_key = "destino"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

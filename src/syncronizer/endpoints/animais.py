@@ -134,7 +134,7 @@ class AnimaisEndpoint(BatchEndpoint):
 
     payload_key = "animais"
     record_key = "COD_ANIMAL"
-    error_key = "cod_animal"
+    error_key = "chave"
     CHUNK = 200                      # animals per POST (<= API max 500, under rate limits)
 
     _BASE_SQL = """

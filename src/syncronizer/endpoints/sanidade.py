@@ -82,7 +82,7 @@ class SanidadeEndpoint(BatchEndpoint):
 
     payload_key = "sanidade"
     record_key = "COD_SANIDADE"
-    error_key = "cod_sanidade"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

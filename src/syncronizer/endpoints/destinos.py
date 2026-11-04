@@ -48,7 +48,7 @@ class DestinosEndpoint(BatchEndpoint):
 
     payload_key = "destinos"
     record_key = "COD_DESTINO"
-    error_key = "cod_destino"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

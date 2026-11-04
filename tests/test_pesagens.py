@@ -130,6 +130,6 @@ def test_send_posts_batch_under_pesagens_key_without_farm_id():
 def test_send_reconciles_per_item_errors():
     ep = PesagensEndpoint()
     http = _Http({"inserted": 1, "errors": [
-        {"cod_pesagem": "46872", "message": "animal inexistente"}]})
+        {"index": 1, "chave": "46872", "message": "animal inexistente"}]})
     res = ep.send(http, [_unsent(46871), _unsent(46872)])
     assert res.ok == ["46871"] and [pk for pk, _ in res.failed] == ["46872"]

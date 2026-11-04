@@ -106,7 +106,7 @@ class AlimentosEndpoint(BatchEndpoint):
 
     payload_key = "alimentos"
     record_key = "COD_ALIMENTO"
-    error_key = "cod_alimento"
+    error_key = "chave"
 
     _BASE_SQL = """
         SELECT

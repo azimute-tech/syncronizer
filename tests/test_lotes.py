@@ -120,6 +120,7 @@ def test_send_posts_batch_under_lotes_key_without_farm_id():
 
 def test_send_reconciles_per_item_errors():
     ep = LotesEndpoint()
-    http = _Http({"inserted": 1, "errors": [{"cod_lote": "10002", "message": "curral inexistente"}]})
+    http = _Http({"inserted": 1, "errors": [
+        {"index": 1, "chave": "10002", "message": "curral inexistente"}]})
     res = ep.send(http, [_unsent(10001), _unsent(10002)])
     assert res.ok == ["10001"] and [pk for pk, _ in res.failed] == ["10002"]
